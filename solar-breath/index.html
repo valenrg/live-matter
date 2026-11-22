@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solar Breath</title>
+<meta name="description" content="Curtains of aurora over a still northern lake, driven by the live solar wind.">
+<meta name="theme-color" content="#02040a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: full-screen canvas, museum placard bottom-left, quiet controls bottom-right. Single dark world by choice. */
+  --wall:#02040a;
+  --ink:#ecebf2;
+  --ink-dim:#8d8b9c;
+  --line:rgba(236,235,242,.18);
+  --glass:rgba(14,14,20,.55);
+  --accent:#7dffb2;
+  --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --font-body:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--wall);color:var(--ink);overflow:hidden}
+body{font-family:var(--font-body);font-size:12px;line-height:1.4}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.ui{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:16px;pointer-events:none;transition:opacity .8s ease}
+.ui.idle{opacity:0}
+.placard{pointer-events:none;max-width:62ch;display:flex;flex-direction:column;gap:5px}
+.placard h1{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:26px;line-height:1;margin:0 0 2px;letter-spacing:.01em}
+.placard p{margin:0;color:var(--ink-dim);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-variant-numeric:tabular-nums}
+.placard p.read{color:var(--ink);text-transform:none;letter-spacing:.02em;font-size:11px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:auto}
+.btn{font:inherit;font-weight:500;letter-spacing:.06em;text-transform:uppercase;font-size:10px;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn:hover{border-color:var(--ink)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[hidden]{display:none}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:#02040a}
+.fallback p{max-width:40ch;background:var(--glass);padding:14px 18px;border-radius:12px;border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.ui{transition:none}}
+
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Generative artwork: aurora curtains over a lake, driven by live solar wind data from NOAA"></canvas>
+<div class="fallback" id="fallback"><p id="fallbackText">This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
+
+<div class="ui" id="ui">
+  <div class="placard">
+    <h1>Solar Breath</h1>
+    <p><span id="status">Connecting to NOAA</span> &middot; tap to pluck a curtain</p>
+    <p class="read" id="read">&nbsp;</p>
+  </div>
+  <div class="controls">
+    <a class="btn back" href="../">&larr; Live Matter</a>
+
+    <button class="btn" id="fsBtn" type="button" hidden>Full screen</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* Shared: full screen where the browser offers it, controls that fade when untouched. */
+var fsBtn=document.getElementById('fsBtn'),root=document.documentElement;
+if(root.requestFullscreen&&document.fullscreenEnabled){
+  fsBtn.hidden=false;
+  fsBtn.addEventListener('click',function(){
+    try{var pr=document.fullscreenElement?document.exitFullscreen():root.requestFullscreen();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}
+  });
+  document.addEventListener('fullscreenchange',function(){fsBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen';});
+}
+var ui=document.getElementById('ui'),idleTimer=null;
+function wake(){ui.classList.remove('idle');clearTimeout(idleTimer);idleTimer=setTimeout(function(){if(!ui.matches(':focus-within'))ui.classList.add('idle');},6000);}
+window.__wake=wake;
+document.addEventListener('keydown',wake);document.addEventListener('pointermove',wake);document.addEventListener('pointerdown',wake);wake();
+window.__fail=function(msg){if(msg)document.getElementById('fallbackText').textContent=msg;document.getElementById('fallback').style.display='grid';};
+window.__framed=(function(){try{return window.self!==window.top;}catch(e){return true;}})();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+/* Solar Breath: curtains of aurora over a still northern lake, driven by the live solar wind measured
+   a million and a half kilometres from Earth (NOAA Space Weather Prediction Center, free, no key).
+   Kp (the planetary geomagnetic index) sets how high and bright the curtains rise;
+   a southward magnetic field (negative Bz) lets the wind couple to Earth and makes them surge;
+   wind speed sets how fast the folds travel; density thickens the light.
+   Strong storms bring red high above the green and a violet fringe below. Tap to pluck a curtain. */
+
+var canvas=document.getElementById('c');
+var gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+if(!gl){window.__fail();return;}
+var statusEl=document.getElementById('status'),readEl=document.getElementById('read');
+
+var VS='#version 300 es\nin vec2 aPos;out vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
+var FS=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform vec2 uRes;uniform float uT,uAct,uSpeed,uDens,uRed,uPulse,uDrift;uniform vec3 uPl;',
+'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+'float h1(float x){return fract(sin(x*127.1)*43758.5453);}',
+'float n1(float x){float i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(h1(i),h1(i+1.),f);}',
+'float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);}',
+'float fbm1(float x){return n1(x)*.55+n1(x*2.1+3.)*.28+n1(x*4.3+7.)*.17;}',
+'const float HOR=.30;',
+/* one curtain: a folded ribbon whose lower edge is sharp, with vertical rays fading upward */
+'vec3 curtain(vec2 p,float i,float t){',
+' float depth=1.-i*.22;',
+' float sp=(.05+.16*uSpeed)*(1.+i*.3);',
+' float x=p.x*(.8+i*.35)+i*7.3;',
+' float base=HOR+.12+(.10+i*.07)*(.35+.9*uAct)+.05*sin(t*.05+i);',
+' float fold=(fbm1(x*1.6-t*sp)-.5)*(.12+.16*uAct)+(fbm1(x*4.8+t*sp*1.6+i)-.5)*.07+(n1(x*11.+t*sp*3.)-.5)*.015;',
+' float edge=base+fold;',
+' float d=p.y-edge;',
+' float hgt=(.05+.20*uAct)*depth*(.7+.6*n1(x*2.+t*.1));',
+' float env=mix(.08,1.,smoothstep(.3,.75,n1(x*.85-t*sp*.6+i*3.1)));',
+' float rays=n1(x*38.+fold*60.+t*(.4+1.6*uSpeed));',
+' float rays0=rays;rays=pow(rays,2.4);',
+' float pulse=.75+.25*n1(t*(.6+uSpeed)+i*9.+x*.5)+uPulse*.6;',
+' float above=smoothstep(-.002,.012,d)*exp(-max(d,0.)/hgt);',
+' float below=exp(min(d,0.)/.006)*(1.-step(0.,d));',
+' float pl=uPl.z*exp(-pow((abs(p.x-uPl.x)-(uT-uPl.y)*.5)/.05,2.))*exp(-(uT-uPl.y)*.9);',
+' float line=exp(-abs(d)/.0035)*.55*(.4+.6*rays0);',
+' float haze=smoothstep(0.,hgt*.5,d)*exp(-max(d,0.)/(hgt*.9))*.05*rays0;',
+' float I=1.3*(above*rays+haze+line+below*.25*smoothstep(.4,.8,uAct))*env*pulse*(.25+.95*uAct+.3*uDens)*depth*(1.+pl*2.5);',
+' float up=clamp(d/(hgt*2.2),0.,1.);',
+' vec3 green=vec3(.25,1.,.55),red=vec3(1.,.18,.32),vio=vec3(.62,.32,1.);',
+' vec3 col=mix(green,mix(green,red,.85),smoothstep(.2,.9,up)*uRed);',
+' col=mix(col,vec3(.4,.85,1.),smoothstep(.5,1.,up)*(1.-uRed)*.35);',
+' col+=vio*below*smoothstep(.45,.9,uAct)*1.6;',
+' return col*I;',
+'}',
+'vec3 sky(vec2 p,float t){',
+' float y=p.y-HOR;',
+' vec3 c=mix(vec3(.010,.022,.045),vec3(.0,.004,.012),smoothstep(0.,.8,y));',
+' c+=vec3(.02,.05,.06)*exp(-y*8.);',
+/* stars */
+' vec2 g=p*vec2(uRes.x/uRes.y,1.)*140.;vec2 id=floor(g);float s=hash(id);',
+' if(s>.985){vec2 f=fract(g)-.5;float tw=.6+.4*sin(t*(1.+s*3.)+s*50.);c+=vec3(.75,.82,1.)*smoothstep(.12,0.,length(f))*tw*(s-.985)*60.;}',
+' vec3 a=vec3(0.);',
+' for(int i=3;i>=0;i--){a+=curtain(p,float(i),t);}',
+' c+=a*(1.-smoothstep(.9,1.25,p.y));',
+' return c;',
+'}',
+'float ridge(float x){return HOR+.012+.035*fbm1(x*3.1+2.)+.02*fbm1(x*9.+5.)-.02;}',
+'void main(){',
+' vec2 p=vec2((gl_FragCoord.x-.5*uRes.x)/uRes.y+uDrift,gl_FragCoord.y/uRes.y);',
+' float t=uT;vec3 col;',
+' float r=ridge(p.x);',
+' if(p.y>HOR){',
+'  col=sky(p,t);',
+'  if(p.y<r)col=vec3(.004,.006,.010)+col*.03;',
+' }else{',
+/* the lake: the sky mirrored, broken by slow ripples, darker toward the shore */
+'  float dy=HOR-p.y;',
+'  float rip=(noise(vec2(p.x*12.,dy*90.-t*.6))-.5)*.012*(.3+dy*6.)+(noise(vec2(p.x*40.,dy*260.+t))-.5)*.004;',
+'  vec2 q=vec2(p.x+rip,HOR+dy*1.05+rip*.5);',
+'  col=sky(q,t)*.42*(1.-smoothstep(0.,.3,dy)*.5);',
+'  col+=vec3(.0,.002,.004);',
+'  float shore=smoothstep(.0,.006,dy);col*=shore;',
+' }',
+' col=1.-exp(-col*1.6);',
+' col=pow(col,vec3(.92));',
+' vec2 vv=vUv-.5;col*=1.-.4*dot(vv,vv);',
+' col+=(hash(gl_FragCoord.xy+fract(t)*61.)-.5)*.012;',
+' o=vec4(col,1.);',
+'}'].join('\n');
+
+function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
+var prog;
+try{
+  prog=gl.createProgram();gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS));gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+  gl.bindAttribLocation(prog,0,'aPos');gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog));
+}catch(e){window.__fail();return;}
+var U={};['uRes','uT','uAct','uSpeed','uDens','uRed','uPulse','uDrift','uPl'].forEach(function(n){U[n]=gl.getUniformLocation(prog,n);});
+var vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+var W=1,H=1;
+function resize(){
+  var dpr=Math.min(window.devicePixelRatio||1,1.5);
+  var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
+  if(w===W&&h===H)return;W=w;H=h;canvas.width=w;canvas.height=h;
+}
+window.addEventListener('resize',resize);resize();
+
+/* ---------- space weather ---------- */
+var BASE='https://services.swpc.noaa.gov/';
+var sw={speed:400,dens:5,bz:0,bt:5,kp:2,live:false,sim:false,when:null};
+function num(v){var n=typeof v==='number'?v:parseFloat(v);return isFinite(n)?n:null;}
+/* NOAA files are arrays of objects (or, in older products, a header row then arrays). Take the newest usable record. */
+function rows(json){
+  if(!Array.isArray(json)||!json.length)return [];
+  if(Array.isArray(json[0])){var hd=json[0];return json.slice(1).map(function(r){var o={};hd.forEach(function(k,i){o[k]=r[i];});return o;});}
+  return json;
+}
+function newest(list,key){
+  var best=null;
+  for(var i=0;i<list.length;i++){var r=list[i];if(r.active===false)continue;if(num(r[key])==null)continue;if(!best||String(r.time_tag)>String(best.time_tag))best=r;}
+  return best;
+}
+function getJSON(path){return fetch(BASE+path,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});}
+function poll(){
+  Promise.all([
+    getJSON('json/rtsw/rtsw_wind_1m.json').then(function(j){var r=newest(rows(j),'proton_speed');if(r){sw.speed=num(r.proton_speed);var d=num(r.proton_density);if(d!=null)sw.dens=d;sw.when=r.time_tag;}}),
+    getJSON('json/rtsw/rtsw_mag_1m.json').then(function(j){var r=newest(rows(j),'bz_gsm');if(r){sw.bz=num(r.bz_gsm);var b=num(r.bt);if(b!=null)sw.bt=b;}}),
+    getJSON('json/planetary_k_index_1m.json').then(function(j){
+      var L=rows(j),r=null,key=null;
+      ['estimated_kp','kp_index','Kp','kp'].some(function(k){r=newest(L,k);if(r){key=k;return true;}return false;});
+      if(r)sw.kp=num(r[key]);
+    })
+  ]).then(function(){
+    sw.live=true;sw.sim=false;statusEl.textContent='Live from NOAA · '+state(sw.kp);
+  }).catch(function(){
+    if(!sw.live)startSim();else statusEl.textContent='Waiting for NOAA · showing the last reading';
+  });
+}
+function state(kp){
+  if(kp>=9)return 'extreme storm (G5)';if(kp>=8)return 'severe storm (G4)';if(kp>=7)return 'strong storm (G3)';
+  if(kp>=6)return 'moderate storm (G2)';if(kp>=5)return 'minor storm (G1)';if(kp>=4)return 'active';if(kp>=3)return 'unsettled';return 'quiet';
+}
+function startSim(){
+  if(sw.sim)return;sw.sim=true;
+  statusEl.textContent='Preview with simulated solar wind';
+}
+poll();setInterval(poll,60000);
+
+/* ---------- pluck ---------- */
+var pl=[0,-99,0],clock=0;
+canvas.addEventListener('pointerdown',function(ev){
+  var r=canvas.getBoundingClientRect();
+  var x=((ev.clientX-r.left)-r.width/2)/r.height;
+  pl=[x,clock,1];
+});
+
+/* ---------- loop ---------- */
+var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var t=Math.random()*1000,last=performance.now(),cur={act:.3,speed:.2,dens:.3,red:0},pulse=0,nextSub=20,shown=0;
+function clamp(x){return Math.max(0,Math.min(1,x));}
+function frame(now){
+  requestAnimationFrame(frame);
+  resize();
+  var dt=Math.min(.05,(now-last)/1000);last=now;clock+=dt;
+  if(sw.sim){
+    /* a slow made-up storm cycle so the preview shows the whole range */
+    var c=.5+.5*Math.sin(clock*.035);
+    sw.kp=1.5+6*c*c;sw.bz=-12*c*c+3*(1-c)+2*Math.sin(clock*.3);sw.speed=380+320*c;sw.dens=4+10*c;
+  }
+  var kpN=clamp(sw.kp/9),bzN=clamp(-sw.bz/15),spN=clamp((sw.speed-300)/500),dnN=clamp(Math.log(Math.max(1,sw.dens))/Math.log(30));
+  var actT=clamp(.12+.62*kpN+.32*bzN+.1*spN);
+  var k=1-Math.pow(.92,dt);
+  cur.act+=(actT-cur.act)*k;cur.speed+=(spN-cur.speed)*k;cur.dens+=(dnN-cur.dens)*k;
+  cur.red+=(clamp((cur.act-.55)/.35)-cur.red)*k;
+  /* substorms: sudden brightenings, more often when the field points south */
+  nextSub-=dt*(1+bzN*4+kpN*2);
+  if(nextSub<=0){pulse=.6+.6*Math.random()*(.3+bzN);nextSub=40+Math.random()*80;}
+  pulse*=Math.pow(.6,dt);
+  t+=dt*(calm?.35:1);
+  gl.viewport(0,0,W,H);gl.useProgram(prog);
+  gl.uniform2f(U.uRes,W,H);gl.uniform1f(U.uT,t);gl.uniform1f(U.uAct,cur.act);gl.uniform1f(U.uSpeed,cur.speed);
+  gl.uniform1f(U.uDens,cur.dens);gl.uniform1f(U.uRed,cur.red);gl.uniform1f(U.uPulse,pulse);
+  gl.uniform1f(U.uDrift,Math.sin(clock*.01)*.08);
+  gl.uniform3f(U.uPl,pl[0]+Math.sin(clock*.01)*.08,pl[1]-clock+t,pl[2]);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  if(++shown%30===0){
+    var bz=sw.bz;
+    readEl.textContent='wind '+Math.round(sw.speed)+' km/s · density '+sw.dens.toFixed(1)+' /cm³ · Bz '+(bz<0?'−':'+')+Math.abs(bz).toFixed(1)+' nT · Kp '+sw.kp.toFixed(1);
+    if(sw.sim)statusEl.textContent='Preview with simulated solar wind · '+state(sw.kp);
+  }
+}
+requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>
