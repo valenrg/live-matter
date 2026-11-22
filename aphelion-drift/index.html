@@ -48,10 +48,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 <div class="ui" id="ui">
   <div class="placard">
     <h1>Aphelion Drift</h1>
-    <p>Drag to stir the dust &middot; add music to make it pulse</p>
+    <p><span id="hint">Drag to stir the dust &middot; it listens and answers to sound</span></p>
   </div>
   <div class="controls">
     <a class="btn back" href="../">&larr; Live Matter</a>
+    <button class="btn" id="micBtn" type="button" hidden>Use microphone</button>
     <label class="btn file" id="fileLabel"><span id="fileText">Add music</span>
       <input type="file" id="audioFile" accept="audio/*">
     </label>
@@ -248,19 +249,31 @@ function up(){pt.down=false;pt.last=null;}
 canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
 canvas.addEventListener('pointerleave',function(){pt.last=null;});
 
-/* Audio: a music file drives bursts (bass), turbulence (mids) and star twinkle (highs). */
+/* Sound: microphone or a music file. Bass swells the cloud, mids stir turbulence, highs make the bright stars flare.
+   Each band adapts to the room's own noise floor, and every response eases in and out so nothing twitches.
+   A sudden sound (a clap, a word) opens a slow vortex somewhere in the dust. */
 var audioEl=document.getElementById('audio'),fileIn=document.getElementById('audioFile');
 var playBtn=document.getElementById('playBtn'),fileText=document.getElementById('fileText');
-var actx=null,analyser=null,bins=null,lv={bass:0,mid:0,high:0},objUrl=null;
+var micBtn=document.getElementById('micBtn'),hint=document.getElementById('hint');
+var actx=null,analyser=null,bins=null,wave=null,elSrc=null,micSrc=null,micStream=null,micOn=false,objUrl=null;
+var lv={bass:0,mid:0,high:0};
+var bandS=[{floor:.05,peak:.2},{floor:.03,peak:.15},{floor:.01,peak:.08}];
+var snd={floor:.02,peak:.08,fast:0,slow:0,cool:0,onset:0};
+var framed=true;try{framed=window.self!==window.top;}catch(e){framed=true;}
 function setupAudio(){
-  if(actx)return;
-  var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
-  actx=new AC();analyser=actx.createAnalyser();analyser.fftSize=1024;analyser.smoothingTimeConstant=.72;
-  bins=new Uint8Array(analyser.frequencyBinCount);
-  var src=actx.createMediaElementSource(audioEl);src.connect(analyser);analyser.connect(actx.destination);
+  if(actx)return true;
+  var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;
+  actx=new AC();analyser=actx.createAnalyser();analyser.fftSize=1024;analyser.smoothingTimeConstant=.88;
+  bins=new Uint8Array(analyser.frequencyBinCount);wave=new Uint8Array(analyser.fftSize);
+  return true;
 }
 function tryPlay(){
-  try{setupAudio();if(actx&&actx.state==='suspended')actx.resume();}catch(e){}
+  try{
+    if(setupAudio()){
+      if(!elSrc){elSrc=actx.createMediaElementSource(audioEl);elSrc.connect(analyser);elSrc.connect(actx.destination);}
+      if(actx.state==='suspended')actx.resume();
+    }
+  }catch(e){}
   var pr=audioEl.play();
   if(pr&&pr.catch)pr.catch(function(){playBtn.textContent='Play';});
 }
@@ -275,37 +288,64 @@ playBtn.addEventListener('click',function(){if(audioEl.paused)tryPlay();else aud
 audioEl.addEventListener('play',function(){playBtn.textContent='Pause';});
 audioEl.addEventListener('pause',function(){playBtn.textContent='Play';});
 audioEl.addEventListener('error',function(){if(audioEl.src){fileText.textContent='That file would not play. Try an MP3 or M4A';playBtn.hidden=true;}});
-function band(a,b){var s=0;for(var i=a;i<b;i++)s+=bins[i];return s/((b-a)*255);}
-function readAudio(){
-  var b=0,m=0,h=0;
-  if(analyser&&!audioEl.paused){analyser.getByteFrequencyData(bins);b=band(1,9);m=band(9,70);h=band(70,260);}
-  lv.bass+=(b-lv.bass)*(b>lv.bass?.5:.08);
-  lv.mid+=(m-lv.mid)*.12;
-  lv.high+=(h-lv.high)*(h>lv.high?.5:.12);
-}
 
-var fsBtn=document.getElementById('fsBtn'),root=document.documentElement;
-if(root.requestFullscreen&&document.fullscreenEnabled){
-  fsBtn.hidden=false;
-  fsBtn.addEventListener('click',function(){
-    try{var pr=document.fullscreenElement?document.exitFullscreen():root.requestFullscreen();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}
+function stopMic(){
+  if(micSrc){try{micSrc.disconnect();}catch(e){}micSrc=null;}
+  if(micStream){micStream.getTracks().forEach(function(t){t.stop();});micStream=null;}
+  micOn=false;micBtn.textContent='Use microphone';
+}
+if(!framed&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+  micBtn.hidden=false;
+  micBtn.addEventListener('click',function(){
+    if(micOn){stopMic();return;}
+    if(!setupAudio()){hint.textContent='This browser cannot analyse sound';return;}
+    if(actx.state==='suspended')actx.resume();
+    navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}).then(function(stream){
+      micStream=stream;micSrc=actx.createMediaStreamSource(stream);micSrc.connect(analyser);
+      micOn=true;micBtn.textContent='Microphone on';hint.textContent='Listening. Speak, clap or make noise';
+    }).catch(function(){hint.textContent='Microphone was blocked. Allow it in the browser settings and tap again';});
   });
-  document.addEventListener('fullscreenchange',function(){fsBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen';});
+}else{
+  hint.textContent='Drag to stir the dust · add music to make it pulse';
 }
-
-var ui=document.getElementById('ui'),idleTimer=null;
-function wake(){ui.classList.remove('idle');clearTimeout(idleTimer);idleTimer=setTimeout(function(){if(!ui.matches(':focus-within'))ui.classList.add('idle');},6000);}
-document.addEventListener('keydown',wake);ui.addEventListener('pointerdown',wake);wake();
+function band(a,b){var s=0;for(var i=a;i<b;i++)s+=bins[i];return s/((b-a)*255);}
+function norm(x,st){
+  st.floor+=(x-st.floor)*(x<st.floor?.08:.0008);
+  st.peak=Math.max(st.peak*.9995,x,st.floor+.04);
+  return Math.max(0,Math.min(1,(x-st.floor*1.3)/(st.peak-st.floor)));
+}
+function readAudio(dt){
+  var live=analyser&&(micOn||!audioEl.paused);
+  var b=0,m=0,h=0,lvl=0;
+  if(live){
+    analyser.getByteFrequencyData(bins);
+    b=norm(band(1,9),bandS[0]);m=norm(band(9,70),bandS[1]);h=norm(band(70,260),bandS[2]);
+    analyser.getByteTimeDomainData(wave);
+    var s=0;for(var i=0;i<wave.length;i++){var v=(wave[i]-128)/128;s+=v*v;}
+    var rms=Math.sqrt(s/wave.length);
+    snd.floor+=(rms-snd.floor)*(rms<snd.floor?.08:.0008);
+    snd.peak=Math.max(snd.peak*.9995,rms,snd.floor+.03);
+    lvl=Math.max(0,Math.min(1,(rms-snd.floor*1.4)/(snd.peak-snd.floor)));
+  }
+  lv.bass+=(b-lv.bass)*(b>lv.bass?.05:.025);
+  lv.mid+=(m-lv.mid)*(m>lv.mid?.04:.02);
+  lv.high+=(h-lv.high)*(h>lv.high?.05:.025);
+  snd.fast+=(lvl-snd.fast)*.3;snd.slow+=(lvl-snd.slow)*.012;
+  snd.cool-=dt;snd.onset=0;
+  if(live&&snd.fast-snd.slow>.38&&snd.cool<=0){snd.onset=Math.min(1,snd.fast-snd.slow+.2);snd.cool=1.4;}
+}
 
 var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-var simT=Math.random()*500,clock=0,last=performance.now(),eye=[0,0],cur=0,frameNo=0;
+var burst={w:[0,0],act:0,target:0},simT=Math.random()*500,clock=0,last=performance.now(),eye=[0,0],cur=0,frameNo=0;
 
 function frame(now){
   requestAnimationFrame(frame);
   resize();
   var rdt=Math.min(.05,(now-last)/1000);last=now;clock+=rdt;frameNo++;
   var dt=rdt*(calm?.3:1);simT+=dt;
-  readAudio();
+  readAudio(rdt);
+  if(snd.onset>0){burst.w=[(Math.random()*1.6-.8)*B[0],(Math.random()*1.6-.8)*B[1]];burst.target=Math.min(.75,.25+.5*snd.onset);}
+  burst.target*=Math.pow(.25,rdt);burst.act+=(burst.target-burst.act)*.05;
   var sway=calm?.3:1;
   var ex=(.22*Math.sin(clock*.13)*sway+pt.look[0]*.22)*Math.min(1,B[0]/.5);
   var ey=.17*Math.sin(clock*.17+1.3)*sway+pt.look[1]*.2;
@@ -322,8 +362,8 @@ function frame(now){
   gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);
   gl.useProgram(pPart.p);var u=pPart.u;
   gl.uniform1f(u.uT,simT);gl.uniform1f(u.uDt,dt);gl.uniform1f(u.uAsp,W/H);gl.uniform1f(u.uPx,H);gl.uniform1f(u.uGain,gain);
-  gl.uniform1f(u.uBass,lv.bass);gl.uniform1f(u.uMid,lv.mid);gl.uniform1f(u.uHigh,lv.high);gl.uniform1f(u.uPAct,pt.act);
-  gl.uniform2f(u.uB,B[0],B[1]);gl.uniform2f(u.uEye,eye[0],eye[1]);gl.uniform2f(u.uPt,pt.w[0],pt.w[1]);gl.uniform2f(u.uPVel,vx,vy);
+  gl.uniform1f(u.uBass,lv.bass);gl.uniform1f(u.uMid,lv.mid);gl.uniform1f(u.uHigh,lv.high);var useB=burst.act>pt.act;gl.uniform1f(u.uPAct,useB?burst.act:pt.act);
+  gl.uniform2f(u.uB,B[0],B[1]);gl.uniform2f(u.uEye,eye[0],eye[1]);gl.uniform2f(u.uPt,useB?burst.w[0]:pt.w[0],useB?burst.w[1]:pt.w[1]);gl.uniform2f(u.uPVel,useB?0:vx,useB?0:vy);
   gl.uniform1i(u.uFrame,frameNo);
   gl.bindVertexArray(vaos[cur]);
   gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK,tfo);

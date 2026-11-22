@@ -44,7 +44,8 @@ h1 em{font-style:italic;color:var(--signal)}
 
 .count{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);color:var(--dim)}
 
-.works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 clamp(16px,2.4vw,32px)}
+.works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(16px,2.4vw,32px)}
+@media (min-width:1001px){.works:has(> .work:nth-child(3)){grid-template-columns:repeat(3,minmax(0,1fr))}}
 .work{border-bottom:1px solid var(--rule)}
 .work a{display:flex;flex-direction:column;gap:14px;padding:clamp(20px,2.6vw,32px) 0 28px;text-decoration:none;height:100%}
 .work a:focus-visible{outline:2px solid var(--signal);outline-offset:6px}
@@ -68,7 +69,6 @@ h1 em{font-style:italic;color:var(--signal)}
 footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;padding:20px 0 32px;border-top:1px solid var(--rule);color:var(--dim)}
 
 @media (max-width:1000px){
-  .works{grid-template-columns:repeat(2,minmax(0,1fr))}
   .mast{grid-template-columns:1fr}
 }
 @media (max-width:640px){
@@ -91,12 +91,12 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;pa
     <p class="statement">Artworks that keep moving on their own and answer to what is around them: your touch, the sound of the room, the edits of strangers on the other side of the world. <span>Each one runs live in your browser and never plays the same way twice.</span></p>
   </section>
 
-  <div class="count mono"><span>Works</span><span>03</span></div>
+  <div class="count mono"><span>Works</span><span>02</span></div>
 
   <ol class="works">
     <li class="work">
       <a href="tide-of-edits/">
-        <span class="no mono">03 &middot; 2026</span>
+        <span class="no mono">02 &middot; 2026</span>
         <div class="frame"><img src="tide-of-edits/thumb.jpg" alt="Purple, magenta and pale lilac paint folding inside a deep frame" width="960" height="640" loading="lazy"></div>
         <h2>Tide of Edits</h2>
         <p>Every edit made to any Wikipedia, as it happens, lands in its language's corner of the canvas. Words added push the paint outward, words removed pull it in.</p>
@@ -106,20 +106,10 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;pa
     </li>
     <li class="work">
       <a href="aphelion-drift/">
-        <span class="no mono">02 &middot; 2026</span>
+        <span class="no mono">01 &middot; 2026</span>
         <div class="frame"><img src="aphelion-drift/thumb.jpg" alt="A cloud of violet, cyan and gold particles drifting in a dark box" width="960" height="640" loading="lazy"></div>
         <h2>Aphelion Drift</h2>
-        <p>Hundreds of thousands of points of light fold into nebula-like sheets. Stir the dust with a finger, or give it music to pulse to.</p>
-        <ul class="inputs"><li>Touch</li><li>Music file</li></ul>
-        <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
-      </a>
-    </li>
-    <li class="work">
-      <a href="latent-tide/">
-        <span class="no mono">01 &middot; 2026</span>
-        <div class="frame"><img src="latent-tide/thumb.jpg" alt="Glossy iridescent paint swelling out of a deep frame" width="960" height="640" loading="lazy"></div>
-        <h2>Latent Tide</h2>
-        <p>Thick, glossy pigment swells out of its frame and drifts through moods of its own. It listens to the room: voices swell it, claps send ripples across it.</p>
+        <p>Hundreds of thousands of points of light fold into nebula-like sheets. It listens to the room: voices swell the cloud, claps open slow vortices in the dust.</p>
         <ul class="inputs"><li>Microphone</li><li>Touch</li><li>Music file</li></ul>
         <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
       </a>

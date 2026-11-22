@@ -6,9 +6,8 @@ Generative artworks by Valentina Contini that run live in the browser and answer
 
 | No. | Work | Inputs |
 |---|---|---|
-| 01 | [Latent Tide](latent-tide/) | Microphone, touch, music file |
-| 02 | [Aphelion Drift](aphelion-drift/) | Touch, music file |
-| 03 | [Tide of Edits](tide-of-edits/) | Live Wikipedia edits ([Wikimedia EventStreams](https://stream.wikimedia.org/v2/stream/recentchange)), touch |
+| 01 | [Aphelion Drift](aphelion-drift/) | Microphone, touch, music file |
+| 02 | [Tide of Edits](tide-of-edits/) | Live Wikipedia edits ([Wikimedia EventStreams](https://stream.wikimedia.org/v2/stream/recentchange)), touch |
 
 ## How it's built
 
