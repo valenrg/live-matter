@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Matter</title>
+<meta name="description" content="Generative artworks by Valentina Contini that run live in the browser and answer to touch, sound and streams of data.">
+<meta property="og:title" content="Live Matter">
+<meta property="og:description" content="Generative artworks that run live in the browser and answer to touch, sound and streams of data.">
+<meta property="og:image" content="https://valenrg.github.io/live-matter/tide-of-edits/thumb.jpg">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0F0E11">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: a dark exhibition catalogue. Masthead with statement, then a ruled grid of works, then visitor notes.
+     Own identity: bone text on a violet-black wall, one lilac signal colour, a soft serif against a technical mono. */
+  --wall:#0F0E11;
+  --bone:#ECE8E1;
+  --dim:#A39DA8;
+  --rule:rgba(236,232,225,.16);
+  --signal:#B9A6FF;
+  --font-display:"Fraunces",Georgia,"Times New Roman",serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--wall)}
+body{margin:0;background:var(--wall);color:var(--bone);font-family:var(--font-display);font-size:18px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.shell{max-width:1320px;margin:0 auto;padding:0 clamp(16px,4vw,56px)}
+.mono{font-family:var(--font-mono);font-size:12px;letter-spacing:.04em;line-height:1.6}
+
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;padding:20px 0;border-bottom:1px solid var(--rule);color:var(--dim)}
+.top b{color:var(--bone);font-weight:500}
+
+.mast{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:24px clamp(24px,5vw,72px);align-items:end;padding:clamp(40px,8vw,104px) 0 clamp(32px,5vw,56px)}
+h1{font-weight:300;font-size:clamp(56px,11vw,168px);line-height:.86;letter-spacing:-.035em;margin:0;text-wrap:balance}
+h1 em{font-style:italic;color:var(--signal)}
+.statement{margin:0;max-width:44ch;font-size:clamp(17px,1.6vw,20px);color:var(--bone)}
+.statement span{color:var(--dim)}
+
+.count{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);color:var(--dim)}
+
+.works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 clamp(16px,2.4vw,32px)}
+.work{border-bottom:1px solid var(--rule)}
+.work a{display:flex;flex-direction:column;gap:14px;padding:clamp(20px,2.6vw,32px) 0 28px;text-decoration:none;height:100%}
+.work a:focus-visible{outline:2px solid var(--signal);outline-offset:6px}
+.no{color:var(--dim)}
+.frame{position:relative;aspect-ratio:3/2;overflow:hidden;background:#000;border:1px solid var(--rule)}
+.frame img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.2,.7,.2,1),filter .6s ease;filter:saturate(.92)}
+.work a:hover .frame img,.work a:focus-visible .frame img{transform:scale(1.035);filter:saturate(1.08)}
+.work h2{font-weight:400;font-size:clamp(28px,2.6vw,36px);line-height:1;letter-spacing:-.02em;margin:4px 0 0;text-wrap:balance}
+.work p{margin:0;color:var(--dim);font-size:16px;max-width:42ch}
+.inputs{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.inputs li{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;padding:3px 8px;border:1px solid var(--rule);color:var(--bone)}
+.inputs li.data{border-color:var(--signal);color:var(--signal)}
+.enter{margin-top:auto;display:inline-flex;gap:10px;align-items:center;font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--bone)}
+.enter i{font-style:normal;transition:transform .22s ease}
+.work a:hover .enter i,.work a:focus-visible .enter i{transform:translateX(5px)}
+.work a:hover h2,.work a:focus-visible h2{color:var(--signal)}
+
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px clamp(16px,2.4vw,32px);padding:clamp(40px,6vw,72px) 0}
+.notes h3{font-family:var(--font-mono);font-weight:500;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--signal);margin:0 0 10px}
+.notes p{margin:0;color:var(--dim);font-size:16px;max-width:40ch}
+footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;padding:20px 0 32px;border-top:1px solid var(--rule);color:var(--dim)}
+
+@media (max-width:1000px){
+  .works{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mast{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .works,.notes{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+  .frame img,.enter i{transition:none}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top mono">
+    <span><b>Live Matter</b> &middot; generative works by Valentina Contini</span>
+    <span>Series begun 2026</span>
+  </header>
+
+  <section class="mast">
+    <h1>Live <em>Matter</em></h1>
+    <p class="statement">Artworks that keep moving on their own and answer to what is around them: your touch, the sound of the room, the edits of strangers on the other side of the world. <span>Each one runs live in your browser and never plays the same way twice.</span></p>
+  </section>
+
+  <div class="count mono"><span>Works</span><span>03</span></div>
+
+  <ol class="works">
+    <li class="work">
+      <a href="tide-of-edits/">
+        <span class="no mono">03 &middot; 2026</span>
+        <div class="frame"><img src="tide-of-edits/thumb.jpg" alt="Purple, magenta and pale lilac paint folding inside a deep frame" width="960" height="640" loading="lazy"></div>
+        <h2>Tide of Edits</h2>
+        <p>Every edit made to any Wikipedia, as it happens, lands in its language's corner of the canvas. Words added push the paint outward, words removed pull it in.</p>
+        <ul class="inputs"><li class="data">Live Wikipedia edits</li><li>Touch</li></ul>
+        <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
+      </a>
+    </li>
+    <li class="work">
+      <a href="aphelion-drift/">
+        <span class="no mono">02 &middot; 2026</span>
+        <div class="frame"><img src="aphelion-drift/thumb.jpg" alt="A cloud of violet, cyan and gold particles drifting in a dark box" width="960" height="640" loading="lazy"></div>
+        <h2>Aphelion Drift</h2>
+        <p>Hundreds of thousands of points of light fold into nebula-like sheets. Stir the dust with a finger, or give it music to pulse to.</p>
+        <ul class="inputs"><li>Touch</li><li>Music file</li></ul>
+        <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
+      </a>
+    </li>
+    <li class="work">
+      <a href="latent-tide/">
+        <span class="no mono">01 &middot; 2026</span>
+        <div class="frame"><img src="latent-tide/thumb.jpg" alt="Glossy iridescent paint swelling out of a deep frame" width="960" height="640" loading="lazy"></div>
+        <h2>Latent Tide</h2>
+        <p>Thick, glossy pigment swells out of its frame and drifts through moods of its own. It listens to the room: voices swell it, claps send ripples across it.</p>
+        <ul class="inputs"><li>Microphone</li><li>Touch</li><li>Music file</li></ul>
+        <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
+      </a>
+    </li>
+  </ol>
+
+  <section class="notes" aria-label="Visitor notes">
+    <div>
+      <h3>How to see them</h3>
+      <p>Best full screen on a large display in a dim room. They run on phones too. Each work needs a browser with WebGL 2, which every current browser has.</p>
+    </div>
+    <div>
+      <h3>Sound and data</h3>
+      <p>The microphone is analysed inside your browser and never recorded or sent anywhere. Tide of Edits connects your browser directly to Wikimedia's public stream of edits.</p>
+    </div>
+    <div>
+      <h3>Made with</h3>
+      <p>Hand-written WebGL shaders, no libraries and no AI services. Live data from Wikimedia EventStreams.</p>
+    </div>
+  </section>
+
+  <footer class="mono">
+    <span>&copy; 2026 Valentina Contini</span>
+    <a href="https://github.com/valenrg/live-matter">Source on GitHub</a>
+  </footer>
+</div>
+</body>
+</html>
