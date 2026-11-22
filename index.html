@@ -45,7 +45,8 @@ h1 em{font-style:italic;color:var(--signal)}
 .count{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);color:var(--dim)}
 
 .works{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 clamp(16px,2.4vw,32px)}
-@media (min-width:1001px){.works:has(> .work:nth-child(3)){grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* three across, except with exactly four works, which sit two by two */
+@media (min-width:1001px){.works:has(> .work:nth-child(3)):not(:has(> .work:nth-child(4):last-child)){grid-template-columns:repeat(3,minmax(0,1fr))}}
 .work{border-bottom:1px solid var(--rule)}
 .work a{display:flex;flex-direction:column;gap:14px;padding:clamp(20px,2.6vw,32px) 0 28px;text-decoration:none;height:100%}
 .work a:focus-visible{outline:2px solid var(--signal);outline-offset:6px}
@@ -88,48 +89,38 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;pa
 
   <section class="mast">
     <h1>Live <em>Matter</em></h1>
-    <p class="statement">Artworks that keep moving on their own and answer to what is around them: your touch, the sound of the room, the way you move, strangers posting on the other side of the world, the wind from the Sun. <span>Each one runs live in your browser and never plays the same way twice.</span></p>
+    <p class="statement">Artworks that keep moving on their own and answer to what is around them: your touch, the sound of the room, the way you move, strangers editing on the other side of the world, the wind from the Sun. <span>Each one runs live in your browser and never plays the same way twice.</span></p>
   </section>
 
-  <div class="count mono"><span>Works</span><span>05</span></div>
+  <div class="count mono"><span>Works</span><span>04</span></div>
 
   <ol class="works">
     <li class="work">
       <a href="presence/">
-        <span class="no mono">05 &middot; 2026</span>
-        <div class="frame"><img src="presence/thumb.jpg" alt="Pale smoke curling through a dark room" width="960" height="640" loading="lazy"></div>
+        <span class="no mono">04 &middot; 2026</span>
+        <div class="frame"><img src="presence/thumb.jpg" alt="Pale smoke curling through a dark room, lit from behind" width="960" height="640" loading="lazy"></div>
         <h2>Presence</h2>
-        <p>A room of slow smoke that only you can disturb. The camera sees movement and nothing else; where you move, smoke is released and pushed the way you went.</p>
+        <p>A room of slow smoke lit by a lamp behind it, that only you can disturb. The camera sees movement and nothing else; where you move, smoke is released and pushed the way you went, casting shadows back through the light.</p>
         <ul class="inputs"><li>Camera, movement only</li><li>Touch</li></ul>
         <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
       </a>
     </li>
     <li class="work">
       <a href="solar-breath/">
-        <span class="no mono">04 &middot; 2026</span>
-        <div class="frame"><img src="solar-breath/thumb.jpg" alt="Green aurora curtains above a dark lake and their reflection" width="960" height="640" loading="lazy"></div>
-        <h2>Solar Breath</h2>
-        <p>Aurora curtains over a still lake, driven by the solar wind measured a million and a half kilometres from Earth. Storms make them rise, brighten and turn red.</p>
-        <ul class="inputs"><li class="data">Live solar wind</li><li>Touch</li></ul>
-        <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
-      </a>
-    </li>
-    <li class="work">
-      <a href="murmuration/">
         <span class="no mono">03 &middot; 2026</span>
-        <div class="frame"><img src="murmuration/thumb.jpg" alt="A flock of starlings over a marsh at dusk" width="960" height="640" loading="lazy"></div>
-        <h2>Murmuration</h2>
-        <p>Thousands of starlings over a dusk marsh, moved by everything happening on Bluesky. Every post sends a wave through the flock, and each language turns it its own way.</p>
-        <ul class="inputs"><li class="data">Live Bluesky activity</li><li>Touch</li></ul>
+        <div class="frame"><img src="solar-breath/thumb.jpg" alt="Folded green aurora curtains above a dark mirror and their reflection" width="960" height="640" loading="lazy"></div>
+        <h2>Solar Breath</h2>
+        <p>Folded curtains of aurora drifting above a dark mirror, driven by the solar wind measured a million and a half kilometres from Earth. Storms lift and brighten them, and the strongest bring red to their crowns.</p>
+        <ul class="inputs"><li class="data">Live solar wind</li><li>Touch</li></ul>
         <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
       </a>
     </li>
     <li class="work">
       <a href="tide-of-edits/">
         <span class="no mono">02 &middot; 2026</span>
-        <div class="frame"><img src="tide-of-edits/thumb.jpg" alt="Purple, magenta and pale lilac paint folding inside a deep frame" width="960" height="640" loading="lazy"></div>
+        <div class="frame"><img src="tide-of-edits/thumb.jpg" alt="A sea of violet and lilac pigment rippling toward the horizon" width="960" height="640" loading="lazy"></div>
         <h2>Tide of Edits</h2>
-        <p>Every edit made to any Wikipedia, as it happens, lands in its language's corner of the canvas. Words added push the paint outward, words removed pull it in.</p>
+        <p>A shallow sea of pigment that ripples like a wave tank. Every edit made to any Wikipedia falls into it as it happens: words added rise as crests, words removed sink as troughs.</p>
         <ul class="inputs"><li class="data">Live Wikipedia edits</li><li>Touch</li></ul>
         <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
       </a>
@@ -137,9 +128,9 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;pa
     <li class="work">
       <a href="aphelion-drift/">
         <span class="no mono">01 &middot; 2026</span>
-        <div class="frame"><img src="aphelion-drift/thumb.jpg" alt="A cloud of violet, cyan and gold particles drifting in a dark box" width="960" height="640" loading="lazy"></div>
+        <div class="frame"><img src="aphelion-drift/thumb.jpg" alt="A warped disc of violet, cyan and gold points of light orbiting a dark centre" width="960" height="640" loading="lazy"></div>
         <h2>Aphelion Drift</h2>
-        <p>Hundreds of thousands of points of light fold into nebula-like sheets. It listens to the room: voices swell the cloud, claps open slow vortices in the dust.</p>
+        <p>A disc of light orbiting a dark centre as gravity dictates: the inner points race, the outer ones drift, the rim warps and the plane ripples. It listens to the room; sound opens gaps in the disc, and sudden noises send a wave through it.</p>
         <ul class="inputs"><li>Microphone</li><li>Touch</li><li>Music file</li></ul>
         <span class="enter">Enter work <i aria-hidden="true">&rarr;</i></span>
       </a>
@@ -153,11 +144,11 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 24px;pa
     </div>
     <div>
       <h3>Sound, camera and data</h3>
-      <p>Microphone and camera are analysed inside your browser and never recorded, shown or sent anywhere; Presence only ever sees movement. The data works connect your browser directly to public streams from Wikimedia, Bluesky and NOAA.</p>
+      <p>Microphone and camera are analysed inside your browser and never recorded, shown or sent anywhere; Presence only ever sees movement. The data works connect your browser directly to public streams from Wikimedia and NOAA.</p>
     </div>
     <div>
       <h3>Made with</h3>
-      <p>Hand-written WebGL shaders and simulations, no libraries and no AI services. Live data from Wikimedia EventStreams, Bluesky Jetstream and the NOAA Space Weather Prediction Center.</p>
+      <p>Hand-written WebGL shaders and simulations, no libraries and no AI services. Live data from Wikimedia EventStreams and the NOAA Space Weather Prediction Center.</p>
     </div>
   </section>
 

@@ -1,6 +1,6 @@
 # Live Matter
 
-Generative artworks by Valentina Contini that run live in the browser and answer to touch, sound and streams of data.
+Generative artworks by Valentina Contini that run live in the browser and answer to touch, sound and streams of data. Each work is abstract, but each is one real physical phenomenon in motion: orbits, waves, the aurora, smoke in light.
 
 **Gallery:** https://valenrg.github.io/live-matter/
 
@@ -8,9 +8,8 @@ Generative artworks by Valentina Contini that run live in the browser and answer
 |---|---|---|
 | 01 | [Aphelion Drift](aphelion-drift/) | Microphone, touch, music file |
 | 02 | [Tide of Edits](tide-of-edits/) | Live Wikipedia edits ([Wikimedia EventStreams](https://stream.wikimedia.org/v2/stream/recentchange)), touch |
-| 03 | [Murmuration](murmuration/) | Live Bluesky posts, likes, reposts and follows ([Jetstream](https://bsky.network/docs/jetstream)), pointer |
-| 04 | [Solar Breath](solar-breath/) | Live solar wind and Kp index ([NOAA SWPC](https://services.swpc.noaa.gov/json/rtsw/)), touch |
-| 05 | [Presence](presence/) | Camera (movement only, nothing recorded), touch |
+| 03 | [Solar Breath](solar-breath/) | Live solar wind and Kp index ([NOAA SWPC](https://services.swpc.noaa.gov/json/rtsw/)), touch |
+| 04 | [Presence](presence/) | Camera (movement only, nothing recorded), touch |
 
 ## How it's built
 

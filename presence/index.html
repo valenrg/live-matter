@@ -82,7 +82,7 @@ window.__framed=(function(){try{return window.self!==window.top;}catch(e){return
 <script>
 (function(){
 'use strict';
-/* Presence: a room of slow smoke that only you can disturb. With the camera on, the piece sees movement and
+/* Presence: a dark room with a lamp behind slow smoke that only you can disturb. With the camera on, the piece sees movement and
    nothing else: each frame is shrunk to a tiny grid of brightness, compared with the one before, and thrown away.
    Where something moved, smoke is released and pushed the way the movement went. No image is kept, shown or sent.
    Without a camera, your pointer or finger stirs it, and a few slow drafts keep the room alive. */
@@ -114,16 +114,32 @@ vorticity:HEAD+'uniform sampler2D uVelocity,uCurl;uniform float uCurlK,uDt,uBuoy
 pressure:HEAD+'uniform sampler2D uPressure,uDivergence;\nvoid main(){float L=texture(uPressure,vL).x,R=texture(uPressure,vR).x,T=texture(uPressure,vT).x,B=texture(uPressure,vB).x,d=texture(uDivergence,vUv).x;o=vec4((L+R+B+T-d)*.25,0.,0.,1.);}',
 gradient:HEAD+'uniform sampler2D uPressure,uVelocity;\nvoid main(){float L=texture(uPressure,vL).x,R=texture(uPressure,vR).x,T=texture(uPressure,vT).x,B=texture(uPressure,vB).x;vec2 v=texture(uVelocity,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
 scale:HEAD+'uniform sampler2D uTex;uniform float uV;\nvoid main(){o=uV*texture(uTex,vUv);}',
-display:HEAD+'uniform sampler2D uDye;uniform vec2 uDyeTexel;uniform float uT;\n'+
+display:HEAD+'uniform sampler2D uDye;uniform vec2 uDyeTexel,uLight;uniform float uT,uAsp;\n'+
  'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n'+
- 'void main(){vec3 c=texture(uDye,vUv).rgb;\n'+
- ' float l=dot(texture(uDye,vUv-vec2(uDyeTexel.x*3.,0.)).rgb,vec3(.33)),r=dot(texture(uDye,vUv+vec2(uDyeTexel.x*3.,0.)).rgb,vec3(.33));\n'+
- ' float b=dot(texture(uDye,vUv-vec2(0.,uDyeTexel.y*3.)).rgb,vec3(.33)),t=dot(texture(uDye,vUv+vec2(0.,uDyeTexel.y*3.)).rgb,vec3(.33));\n'+
- ' vec3 n=normalize(vec3(l-r,b-t,.22));float dif=clamp(dot(n,normalize(vec3(-.4,.6,.7))),0.,1.);\n'+
- ' vec3 sm=c*(.75+.45*dif);\n'+
- ' vec2 vv=vUv-.5;vec3 bg=mix(vec3(.030,.028,.036),vec3(.010,.010,.014),length(vv)*1.4);\n'+
- ' vec3 col=bg+(1.-exp(-sm*1.15))*.92;\n'+
- ' col*=1.-.35*dot(vv,vv);col+=(hash(gl_FragCoord.xy+fract(uT)*71.)-.5)*.018;o=vec4(col,1.);}'
+ 'float D(vec2 u){return dot(texture(uDye,u).rgb,vec3(.33));}\n'+
+ /* Light passing through smoke (the Tyndall effect): a lamp sits behind the room. Each pixel looks back toward it
+    through the smoke: thick smoke between pixel and lamp casts shadow, gaps let beams through the air. */
+ 'void main(){\n'+
+ ' vec3 c=texture(uDye,vUv).rgb;float d=dot(c,vec3(.33));\n'+
+ ' vec2 toL=uLight-vUv;float dist=length(toL*vec2(uAsp,1.));\n'+
+ ' float j=hash(gl_FragCoord.xy+fract(uT)*13.);\n'+
+ ' float occ=0.,beam=0.,w=1.;\n'+
+ ' for(int i=0;i<28;i++){\n'+
+ '  float f=(float(i)+j)/28.;vec2 s=vUv+toL*f;float ds=D(s);\n'+
+ '  occ+=ds*(1./28.);\n'+
+ '  beam+=(1.-smoothstep(.02,.35,ds))*w;w*=.94;\n'+
+ ' }\n'+
+ ' float T=exp(-occ*4.2);\n'+
+ ' vec3 lamp=vec3(1.,.93,.84);\n'+
+ ' float fall=1./(1.+dist*dist*1.6);\n'+
+ ' float l=D(vUv-vec2(uDyeTexel.x*3.,0.)),r=D(vUv+vec2(uDyeTexel.x*3.,0.)),b=D(vUv-vec2(0.,uDyeTexel.y*3.)),t=D(vUv+vec2(0.,uDyeTexel.y*3.));\n'+
+ ' vec3 n=normalize(vec3(l-r,b-t,.25));vec3 Ld=normalize(vec3(toL*vec2(uAsp,1.),.35));float dif=clamp(dot(n,Ld),0.,1.);\n'+
+ ' float rim=pow(1.-n.z,1.5)*smoothstep(.0,.3,d);\n'+
+ ' vec3 sm=c*(.22+1.25*T*fall*(.55+.6*dif))+lamp*rim*T*fall*.5;\n'+
+ ' vec3 rays=lamp*beam/16.*fall*.45*(1.-smoothstep(.0,.6,d));\n'+
+ ' vec3 bg=vec3(.010,.010,.014)+lamp*.10*exp(-dist*dist*5.);\n'+
+ ' vec3 col=bg+rays+(1.-exp(-sm*1.25))*.95;\n'+
+ ' vec2 vv=vUv-.5;col*=1.-.35*dot(vv,vv);col+=(hash(gl_FragCoord.xy+fract(uT)*71.)-.5)*.018;o=vec4(col,1.);}'
 };
 
 function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
@@ -313,6 +329,7 @@ function frame(now){
   gl.useProgram(q.p);gl.uniform1f(q.u.uDiss,.55);bind(q,'uVelocity',vel.r.tex,0);bind(q,'uSource',dye.r.tex,1);run(q,dye.w,[dye.r.tx,dye.r.ty]);dye.swap();
 
   q=P.display;gl.useProgram(q.p);bind(q,'uDye',dye.r.tex,0);gl.uniform2f(q.u.uDyeTexel,dye.r.tx,dye.r.ty);gl.uniform1f(q.u.uT,clock);
+  gl.uniform2f(q.u.uLight,.5+.22*Math.sin(clock*.031),.80+.08*Math.sin(clock*.023));gl.uniform1f(q.u.uAsp,W/H);
   run(q,null,[1/W,1/H]);
 }
 requestAnimationFrame(frame);
