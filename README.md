@@ -10,6 +10,7 @@ Generative artworks by Valentina Contini that run live in the browser and answer
 | 02 | [Tide of Edits](tide-of-edits/) | Live Wikipedia edits ([Wikimedia EventStreams](https://stream.wikimedia.org/v2/stream/recentchange)), touch |
 | 03 | [Solar Breath](solar-breath/) | Live solar wind and Kp index ([NOAA SWPC](https://services.swpc.noaa.gov/json/rtsw/)), touch |
 | 04 | [Presence](presence/) | Camera (movement only, nothing recorded), touch |
+| 05 | [Fault](fault/) | Live earthquakes ([USGS real-time feeds](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php)), touch |
 
 ## How it's built
 

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fault</title>
+<meta name="description" content="Every earthquake on Earth, as it happens, tearing a dark crust open over a molten world.">
+<meta name="theme-color" content="#040202">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: full-screen canvas, museum placard bottom-left, quiet controls bottom-right. Single dark world by choice. */
+  --wall:#040202;
+  --ink:#ecebf2;
+  --ink-dim:#8d8b9c;
+  --line:rgba(236,235,242,.18);
+  --glass:rgba(14,14,20,.55);
+  --accent:#ff9a3c;
+  --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --font-body:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--wall);color:var(--ink);overflow:hidden}
+body{font-family:var(--font-body);font-size:12px;line-height:1.4}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.ui{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:16px;pointer-events:none;transition:opacity .8s ease}
+.ui.idle{opacity:0}
+.placard{pointer-events:none;max-width:62ch;display:flex;flex-direction:column;gap:5px}
+.placard h1{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:26px;line-height:1;margin:0 0 2px;letter-spacing:.01em}
+.placard p{margin:0;color:var(--ink-dim);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-variant-numeric:tabular-nums}
+.placard p.read{color:var(--ink);text-transform:none;letter-spacing:.02em;font-size:11px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:auto}
+.btn{font:inherit;font-weight:500;letter-spacing:.06em;text-transform:uppercase;font-size:10px;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn:hover{border-color:var(--ink)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[hidden]{display:none}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:radial-gradient(circle at 40% 60%,#8a2a08,#040202 70%)}
+.fallback p{max-width:40ch;background:var(--glass);padding:14px 18px;border-radius:12px;border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.ui{transition:none}}
+.meta{display:flex;align-items:center;gap:8px}.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex:none}.dot.live{background:#ff6a1a}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Generative artwork: a dark crust of plates over molten light; each live earthquake tears a glowing fault across it that cools into a scar, while its waves heave the plates"></canvas>
+<div class="fallback" id="fallback"><p id="fallbackText">This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
+
+<div class="ui" id="ui">
+  <div class="placard">
+    <h1>Fault</h1>
+    <p class="meta"><span class="dot" id="dot"></span><span>Seismic waves &middot; <span id="status">Listening for earthquakes</span></span></p>
+    <p class="read" id="read">&nbsp;</p>
+    <p class="read" id="pulse">&nbsp;</p>
+    <p>Crust, mantle, molten floor &middot; scars fade over hours &middot; tap the crust to break it</p>
+  </div>
+  <div class="controls">
+    <a class="btn back" href="../">&larr; Live Matter</a>
+
+    <button class="btn" id="fsBtn" type="button" hidden>Full screen</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* Shared: full screen where the browser offers it, controls that fade when untouched. */
+var fsBtn=document.getElementById('fsBtn'),root=document.documentElement;
+if(root.requestFullscreen&&document.fullscreenEnabled){
+  fsBtn.hidden=false;
+  fsBtn.addEventListener('click',function(){
+    try{var pr=document.fullscreenElement?document.exitFullscreen():root.requestFullscreen();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}
+  });
+  document.addEventListener('fullscreenchange',function(){fsBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen';});
+}
+var ui=document.getElementById('ui'),idleTimer=null;
+function wake(){ui.classList.remove('idle');clearTimeout(idleTimer);idleTimer=setTimeout(function(){if(!ui.matches(':focus-within'))ui.classList.add('idle');},6000);}
+window.__wake=wake;
+document.addEventListener('keydown',wake);document.addEventListener('pointermove',wake);document.addEventListener('pointerdown',wake);wake();
+window.__fail=function(msg){if(msg)document.getElementById('fallbackText').textContent=msg;document.getElementById('fallback').style.display='grid';};
+window.__framed=(function(){try{return window.self!==window.top;}catch(e){return true;}})();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+/* Fault: every earthquake on Earth, as it happens, tearing through a layered body of molten light.
+   Data: USGS real-time feeds (free, no key). Geography is laid flat: longitude and latitude across, depth down.
+   About two million points fill the volume in layers: a crust of plates with glowing seams, a mantle turning in
+   slow convection rolls, a molten floor far below, ash drifting above. Physics kept, look abstracted:
+   - each quake ruptures a fault plane of its real size (length grows tenfold for every two magnitude units),
+     at its real depth, with a rupture front running across the plane;
+   - it radiates spherical P and S fronts through the whole volume (S slower, shaking across instead of along),
+     and surface waves that heave the crust;
+   - shallow quakes that break the surface throw sparks that fly and fall under gravity, and leave a scar in the
+     crust that fades over hours, so the world's seismic belts draw themselves;
+   - the camera circles the latest strong quake and drifts through the layers. */
+var canvas=document.getElementById('c');
+var gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+if(!gl){window.__fail();return;}
+if(!gl.getExtension('EXT_color_buffer_float')){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+gl.getExtension('EXT_float_blend');
+var statusEl=document.getElementById('status'),readEl=document.getElementById('read'),dotEl=document.getElementById('dot');
+var Q=new URLSearchParams(location.search);
+var low=Q.get('q')==='low'||Math.min(screen.width,screen.height)<700;
+var SCALE=low?.3:1;
+var T=8;                         /* the particle layers repeat every T units; the camera only ever sees one tile's worth */
+var WX=48,WZ=24;                 /* the flat Earth: 360 degrees of longitude by 180 of latitude */
+var DEEP=2.4;                    /* 700 km of depth */
+var PLUMES=[[1.7,2.2],[5.6,4.9],[3.1,6.8]];
+var NQ=8,NSPARK=Math.round(160000*SCALE);
+
+/* ---------- build the volume ---------- */
+function rnd(){return Math.random();}
+var groups=[];
+(function build(){
+  var nCrust=Math.round(1300000*SCALE),nMantle=Math.round(420000*SCALE),nCore=Math.round(160000*SCALE),nAsh=Math.round(50000*SCALE);
+  /* plates: a Voronoi pattern on the tile, with gaps (the seams) between plates */
+  var CS=.42,G=Math.round(T/CS),sites=new Float32Array(G*G*3);
+  for(var j=0;j<G;j++)for(var i=0;i<G;i++){var k=(j*G+i)*3;sites[k]=(i+.15+.7*rnd())*T/G;sites[k+1]=(j+.15+.7*rnd())*T/G;sites[k+2]=rnd();}
+  function nearest(x,z){var gi=Math.floor(x/T*G),gj=Math.floor(z/T*G),d1=1e9,d2=1e9,id=0;
+    for(var dj=-2;dj<=2;dj++)for(var di=-2;di<=2;di++){var ii=((gi+di)%G+G)%G,jj=((gj+dj)%G+G)%G,k=(jj*G+ii)*3;
+      var sx=sites[k]+Math.floor((gi+di)/G)*T,sz=sites[k+1]+Math.floor((gj+dj)/G)*T;var d=Math.hypot(x-sx,z-sz);
+      if(d<d1){d2=d1;d1=d;id=k;}else if(d<d2)d2=d;}
+    return [d2-d1,id];}
+  var A=[],B=[];
+  var crust=0,seam=0;
+  while(crust+seam<nCrust){
+    var x=rnd()*T,z=rnd()*T,r=nearest(x,z),e=r[0],sid=r[1];
+    var hgt=(sites[sid+2]-.5)*.035;
+    if(e<.03){ if(rnd()<.55){A.push(x,-.012-rnd()*.03,z,1);B.push(rnd(),e,0,0);seam++;} }
+    else{var thick=rnd();A.push(x,hgt+(thick-.5)*.035*(e>.08?1:.5),z,0);B.push(rnd(),e,sites[sid+2],0);crust++;}
+  }
+  /* mantle: points circling in convection rolls (hot rising, cool sinking), lying along z */
+  for(var m=0;m<nMantle;m++){
+    var cw=1.6,cx=(Math.floor(rnd()*T/cw)+.5)*cw,cy=-.25-(DEEP-.4)*.5,rr=(Math.floor(rnd()*5)+1)/5.4+(rnd()-.5)*.025;
+    A.push(cx,cy,rnd()*T,2);B.push(rnd(),rr,rnd()*6.2832,cw);
+  }
+  /* the molten floor, far below */
+  for(var c=0;c<nCore;c++){var fx=rnd()*T,fz=rnd()*T,cell=nearest(fx*.5,fz*.5);if(cell[0]>.05&&rnd()<.85){c--;continue;}A.push(fx,-DEEP-.05-Math.pow(rnd(),3)*.25,fz,3);B.push(rnd(),cell[0],0,0);}
+  /* ash drifting above */
+  for(var a=0;a<nAsh;a++){A.push(rnd()*T,.05+Math.pow(rnd(),1.5)*1.6,rnd()*T,4);B.push(rnd(),0,0,0);}
+  var nPl=Math.round(90000*SCALE);
+  for(var q=0;q<nPl;q++){var pi=Math.floor(rnd()*PLUMES.length);A.push(PLUMES[pi][0],0,PLUMES[pi][1],8);B.push(rnd(),pi,rnd()*6.2832,Math.pow(rnd(),.7));}
+  var nFar=Math.round(380000*SCALE),FT=48;
+  for(var f=0;f<nFar;f++){
+    var u=rnd();
+    if(u<.55){var fx=rnd()*FT,fz=rnd()*FT,rr2=nearest(fx%T,fz%T);if(rr2[0]>.03&&rnd()<.8){f--;continue;}A.push(fx,rr2[0]<.03?-.02:0,fz,rr2[0]<.03?5:5.5);B.push(rnd(),rr2[0],sites[rr2[1]+2],0);}
+    else if(u<.85){var gx=rnd()*FT,gz=rnd()*FT,cl=nearest(gx*.5%T,gz*.5%T);if(cl[0]>.05&&rnd()<.85){f--;continue;}A.push(gx,-DEEP-.05-Math.pow(rnd(),3)*.25,gz,6);B.push(rnd(),cl[0],0,0);}
+    else{A.push(rnd()*FT,-.3-rnd()*(DEEP-.4),rnd()*FT,7);B.push(rnd(),0,0,0);}
+  }
+  groups.total=A.length/4;
+  groups.A=new Float32Array(A);groups.B=new Float32Array(B);
+})();
+
+var VS_PTS=['#version 300 es','precision highp float;',
+'in vec4 aA;in vec4 aB;',
+'uniform mat4 uVP;uniform vec3 uCam;uniform float uT,uFocus,uAp,uPx,uTile,uDeep;uniform vec4 uQ0[8],uQ1[8],uQ2[8];uniform int uQN;',
+'uniform sampler2D uScar;uniform vec2 uWorld;uniform float uPulse;',
+'out vec3 vCol;out float vSoft;',
+'float h1(float x){return fract(sin(x*127.1)*43758.5453);}',
+'vec3 lava(float t){t=clamp(t,0.,1.6);',
+' vec3 a=vec3(.28,.025,.006),b=vec3(.95,.14,.02),c=vec3(1.,.48,.07),d=vec3(1.,.84,.38),e=vec3(1.,.97,.88);',
+' return t<.25?mix(vec3(.05,.01,.004),a,t/.25):t<.5?mix(a,b,(t-.25)/.25):t<.8?mix(b,c,(t-.5)/.3):t<1.1?mix(c,d,(t-.8)/.3):mix(d,e,clamp((t-1.1)/.5,0.,1.));}',
+'void main(){',
+' float kind=aA.w;vec3 p=aA.xyz;float seed=aB.x;bool far=kind>4.75;if(far)kind=kind==5.?1.:(kind==5.5?0.:(kind==6.?3.:2.5));',
+/* mantle convection: each point travels round its roll; hotter where it rises */
+' float rise=0.;',
+' if(kind==2.){float w=aB.w,H=uDeep-.4;float ang=aB.z+uT*(.05+.03*h1(seed*9.))/(.3+aB.y);',
+'  p.x=aA.x+cos(ang)*aB.y*w*.46;p.y=aA.y+sin(ang)*aB.y*H*.46;rise=-sin(ang+1.5708)*sign(fract(aA.x/(w*2.))-.5);}',
+' float ph=0.;',
+' if(kind==8.){ph=fract(seed*7.31+uT*(.012+.010*h1(seed*3.))*(.5+uPulse));',
+'  float r=(.035+.05*aB.w)*(1.+.4*sin(ph*20.+seed*9.))+smoothstep(.78,1.,ph)*.75*aB.w;',
+'  float ang=aB.z+uT*.15*(1.-ph);p.x=aA.x+cos(ang)*r;p.z=aA.z+sin(ang)*r;p.y=mix(-uDeep-.05,-.26,ph);}',
+' if(kind==4.){p.x+=sin(uT*.05+seed*40.)*.2;p.z+=cos(uT*.04+seed*30.)*.2;p.y=.05+mod(aA.y-.05+.025*uT*(.2+seed),1.6);}',
+/* place this point on the copy of its tile nearest the camera */
+' float tile=far?48.:uTile;p.xz+=floor((uCam.xz-p.xz)/tile+.5)*tile;',
+' float hd=length(p.xz-uCam.xz);',
+' float reach=far?smoothstep(3.,4.2,hd)*smoothstep(26.,13.,hd):smoothstep(4.1,3.1,hd);',   /* near and far fields cross-fade in a circle */
+/* the layers are not flat: long swells and folds, in world space */
+' vec2 w=p.xz;float rel=.24*sin(w.x*.53+w.y*.21)+.16*sin(w.y*.71-w.x*.37+1.3)+.07*sin(w.x*1.7+w.y*1.3+2.)+.04*sin(w.x*3.1-w.y*2.3);',
+' float floorY=rel*.35+.28*sin(w.x*.31-w.y*.44)+.12*sin(w.y*.9+w.x*.6);',
+' p.y+=kind==3.?floorY:(kind==8.?mix(floorY,rel*.85,ph):(kind==2.||kind==2.5?rel*.6:rel));',
+' float heat=kind==0.?.05+.04*aB.z:(kind==1.?.30+.10*sin(uT*.6+seed*60.):(kind==2.?.20+.38*smoothstep(-.3*uDeep,-uDeep,p.y)+.12*rise:(kind==2.5?.35+.3*seed:(kind==3.?.85:.10))));',
+' float glow=kind==0.?.035:(kind==1.?.9:(kind==2.?.55:(kind==2.5?.9:(kind==3.?1.1:.14))));if(far)glow*=kind==0.?3.:1.6;',
+/* scars of past quakes, from a slow map in world coordinates */
+' if(kind==8.){heat=1.05-.55*ph+.15*uPulse;glow=.55*(.45+uPulse)*(1.-smoothstep(.88,1.,ph))*smoothstep(0.,.04,ph);}',
+/* the floor breathes with the energy released on the whole planet in the last hour, and glows where plumes rise */
+' if(kind==3.){vec2 tp=mod(aA.xz,8.);float rt=0.;',
+'  for(int i=0;i<3;i++){vec2 pc=i==0?vec2(1.7,2.2):(i==1?vec2(5.6,4.9):vec2(3.1,6.8));vec2 dd=tp-pc;dd-=floor(dd/8.+.5)*8.;rt+=exp(-dot(dd,dd)/.09);}',
+'  glow*=.30+1.25*uPulse+rt*1.2;heat=.62+.35*uPulse+.25*rt;}',
+' if(kind<2.){vec2 su=vec2(fract(p.x/uWorld.x),p.z/uWorld.y);float sc=texture(uScar,su).r;heat+=sc*(kind==1.?1.1:.45);glow+=sc*(kind==1.?1.6:.5);}',
+' vec3 disp=vec3(0.);',
+' for(int k=0;k<8;k++){if(k>=uQN)break;',
+'  vec4 q0=uQ0[k],q1=uQ1[k],q2=uQ2[k];',      /* q0: hypocentre xyz, start time; q1: strike, dip, half-length, magnitude; q2: amplitude, ... */
+'  vec3 d=p-q0.xyz;d.x-=floor(d.x/'+WX.toFixed(1)+'+.5)*'+WX.toFixed(1)+';',
+'  float tau=uT-q0.w;if(tau<0.)continue;',
+'  float r=length(d);float A=q2.x;',
+'  if(r>tau*1.7+1.8&&r>q1.z*2.+.5)continue;',
+/* fault plane: along strike s, down dip u, normal n */
+'  vec3 st=vec3(cos(q1.x),0.,sin(q1.x));vec3 dn=vec3(-sin(q1.x)*cos(q1.y),-sin(q1.y),cos(q1.x)*cos(q1.y));vec3 nr=cross(st,dn);',
+'  float s=dot(d,st),u=dot(d,dn),n=dot(d,nr);float L=q1.z,Wd=q1.z*.55;',
+'  float ds=max(abs(s)-L,0.),du=max(abs(u)-Wd,0.);float df=sqrt(ds*ds+du*du+n*n);',
+'  float tf=length(vec2(s,u))/1.1;',                                    /* rupture front speed */
+'  float age=tau-tf;',
+'  if(age>0.){float w=.010+.012*L;float on=exp(-df*df/(w*w));',
+'   heat+=on*1.5*exp(-age/9.)*(.6+.4*exp(-age*3.));glow+=on*3.*exp(-age/8.);',
+'   disp+=nr*sign(n)*on*min(age*.15,.02)*min(L*4.,1.);}',               /* the fault opens */
+/* body waves: spherical fronts, P along the ray, S across it */
+'  float sp=r-1.55*tau,ss=r-.90*tau;float fP=exp(-sp*sp/.004),fS=exp(-ss*ss/.008);',
+'  float att=A/(.25+r)*exp(-tau*.18);',
+'  vec3 rad=d/max(r,1e-3);vec3 tan_=normalize(cross(rad,vec3(.3,1.,.2)));',
+'  float ad=min(att,2.);disp+=rad*fP*ad*.022*sin(sp*60.)+tan_*fS*ad*.03*sin(ss*40.);',
+'  float wa=min(att*.6,1.2)*(kind==4.?.12:(kind==2.?1.:.8));',
+'  float fr=max(fP,fS*.8);heat=mix(heat,max(heat,.5+.35*min(wa,1.)),fr);glow+=(fP*.30+fS*.22)*wa;',
+/* the floor is hit: it flashes, and the front bounces back up as a fainter echo (as waves reflect off the core) */
+'  if(kind==3.){float hit=fP*min(A*.35,3.)*exp(-tau*.12);glow+=hit*1.4;heat=mix(heat,1.15,min(hit,1.));}',
+'  else{float yf=-uDeep-.05;vec3 d2=vec3(d.x,p.y-(2.*yf-q0.y),d.z);float r2=length(d2);',
+'   float se=r2-1.55*tau;float fE=exp(-se*se/.006)*step(yf,p.y);float aE=min(.5*A/(.25+r2)*exp(-tau*.18),1.);',
+'   heat=mix(heat,max(heat,.55),fE*aE);glow+=fE*aE*.28*(kind==4.?.3:1.);}',
+/* surface waves on the crust: a slow, large ring that lifts the plates */
+'  if(kind<2.||kind==4.){float rs=length(d.xz)-.62*tau;float fR=exp(-rs*rs/.03);',
+'   float aR=A*exp(q2.w*1.2)/(.4+sqrt(length(d.xz)))*exp(-tau*.12);',
+'   disp.y+=fR*min(aR,2.)*.05*cos(rs*14.);heat=mix(heat,max(heat,.55+.25*min(aR,1.)*(kind==1.?1.3:1.)),fR);glow+=fR*min(aR,1.5)*(kind==1.?1.2:(kind==4.?.08:.3));}',
+' }',
+' p+=disp;',
+' p.y-=hd*hd/64.;',
+' vec4 c=uVP*vec4(p,1.);gl_Position=c;',
+' float dist=max(c.w,.02);',
+' float coc=uAp*abs(dist-uFocus)/dist;',                                /* the lens: out of focus, a disc */
+' float size=max(uPx,min(coc,46.));gl_PointSize=size;',
+' float e=(uPx*uPx)/(size*size);',
+' float fog=exp(-max(dist-2.4,0.)*.10)*reach;',
+' vCol=lava(heat)*glow*e*fog;',
+' vSoft=size>3.?1.:0.;',
+' if(glow*fog<.002)gl_Position=vec4(2.,2.,2.,1.);',
+'}'].join('\n');
+var FS_PTS=['#version 300 es','precision mediump float;','in vec3 vCol;in float vSoft;out vec4 o;',
+'void main(){vec2 q=gl_PointCoord*2.-1.;float r=dot(q,q);if(r>1.)discard;',
+' float a=mix(1.-r*.5,smoothstep(1.,.75,r)*(.75+.25*r),vSoft);o=vec4(vCol*a,1.);}'].join('\n');
+
+/* sparks: thrown from where a fault breaks the surface, flying and falling, cooling as they go */
+var VS_SPK=['#version 300 es','precision highp float;',
+'uniform mat4 uVP;uniform vec3 uCam;uniform float uT,uFocus,uAp,uPx;uniform vec4 uQ0[8],uQ1[8],uQ2[8];uniform int uQN;',
+'out vec3 vCol;out float vSoft;',
+'float h1(float x){return fract(sin(x*127.1)*43758.5453);}',
+'vec3 lava(float t){t=clamp(t,0.,1.6);vec3 b=vec3(.95,.14,.02),c=vec3(1.,.48,.07),d=vec3(1.,.84,.38),e=vec3(1.,.97,.88);',
+' return t<.5?mix(vec3(.2,.02,.005),b,t/.5):t<.8?mix(b,c,(t-.5)/.3):t<1.1?mix(c,d,(t-.8)/.3):mix(d,e,clamp((t-1.1)/.5,0.,1.));}',
+'void main(){',
+' float id=float(gl_VertexID);int k=int(mod(id,8.));gl_Position=vec4(2.,2.,2.,1.);vCol=vec3(0.);vSoft=0.;',
+' if(k>=uQN)return;',
+' vec4 q0=uQ0[k],q1=uQ1[k],q2=uQ2[k];',
+' float share=q2.y;if(h1(id*.731)>share)return;',                      /* how many sparks this quake gets */
+' float L=q1.z;vec3 st=vec3(cos(q1.x),0.,sin(q1.x));',
+' float s=(h1(id*1.37)*2.-1.)*L;',
+' vec3 o=vec3(q0.x,0.,q0.z)+st*s;vec2 w=o.xz;o.y=.24*sin(w.x*.53+w.y*.21)+.16*sin(w.y*.71-w.x*.37+1.3)+.07*sin(w.x*1.7+w.y*1.3+2.)+.04*sin(w.x*3.1-w.y*2.3);',
+' float born=q0.w+abs(s)/1.1+h1(id*2.9)*1.8*sqrt(L*4.);',
+' float t=uT-born;float life=1.5+3.*h1(id*4.1);',
+' if(t<0.||t>life)return;',
+' float a=h1(id*5.3)*6.2832,el=.5+1.1*h1(id*6.7);',
+' float v=(.35+1.3*h1(id*7.9))*q2.z;',
+' vec3 vel=vec3(cos(a)*cos(el),sin(el),sin(a)*cos(el))*v;',
+' vec3 p=o+vel*t+vec3(0.,-.9,0.)*t*t*.5;',
+' if(p.y<o.y-.3)return;p.y-=dot(p.xz-uCam.xz,p.xz-uCam.xz)/64.;',
+' vec4 c=uVP*vec4(p,1.);gl_Position=c;float dist=max(c.w,.02);',
+' float coc=uAp*abs(dist-uFocus)/dist;float size=max(uPx*1.3,min(coc,40.));gl_PointSize=size;',
+' float e=(uPx*uPx*1.7)/(size*size);',
+' float cool=t/life;',
+' vCol=lava(1.4-1.1*cool)*(1.-cool*cool)*e*4.*exp(-max(dist-2.2,0.)*.32);',
+' vSoft=size>3.?1.:0.;',
+'}'].join('\n');
+
+/* scars: a slow map of where faults broke the surface, fading over hours */
+var VS_Q='#version 300 es\nin vec2 aPos;out vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
+var FS_SCAR=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform sampler2D uS;uniform float uDt,uT;uniform vec4 uQ0[8],uQ1[8],uQ2[8];uniform int uQN;',
+'void main(){float sc=texture(uS,vUv).r*exp(-uDt/5400.);',
+' vec2 P=vec2(vUv.x*'+WX.toFixed(1)+',vUv.y*'+WZ.toFixed(1)+');',
+' for(int k=0;k<8;k++){if(k>=uQN)break;vec4 q0=uQ0[k],q1=uQ1[k];',
+'  float tau=uT-q0.w;if(tau<0.)continue;',
+'  vec2 d=P-q0.xz;d.x-=floor(d.x/'+WX.toFixed(1)+'+.5)*'+WX.toFixed(1)+';',
+'  vec2 st=vec2(cos(q1.x),sin(q1.x));float s=dot(d,st),n=dot(d,vec2(-st.y,st.x));',
+'  float ds=max(abs(s)-q1.z,0.);float w=.012+.01*q1.z;',
+'  float surf=exp(uQ2[k].w*3.);',                                            /* only faults near the surface scar it */
+'  sc=max(sc,exp(-(ds*ds+n*n)/(w*w))*surf*.6*step(abs(s)/1.1,tau));}',
+' o=vec4(sc,0.,0.,1.);}'].join('\n');
+
+/* composite: bloom from the blurred levels, then tone */
+var FS_COMP=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform sampler2D uHdr;uniform float uClk;',
+'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+'void main(){vec3 c=texture(uHdr,vUv).rgb;',
+' vec3 b=textureLod(uHdr,vUv,2.).rgb*.30+textureLod(uHdr,vUv,4.).rgb*.30+textureLod(uHdr,vUv,6.).rgb*.25;',
+' c=c+b*.55+vec3(.010,.003,.002);',
+' c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.);c=pow(c,vec3(1./2.2));',
+' vec2 v=vUv-.5;c*=1.-.5*dot(v,v)*2.;c+=(hash(gl_FragCoord.xy+fract(uClk)*71.)-.5)*.012;o=vec4(c,1.);}'].join('\n');
+
+function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
+function prog(vs,fs,names,attrs){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+  (attrs||['aPos']).forEach(function(a,i){gl.bindAttribLocation(p,i,a);});gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  var u={};names.forEach(function(n){u[n]=gl.getUniformLocation(p,n);});return {p:p,u:u};}
+var QU=['uQ0','uQ1','uQ2','uQN','uT'];
+var pPts,pSpk,pScar,pComp;
+try{
+  pPts=prog(VS_PTS,FS_PTS,['uVP','uCam','uFocus','uAp','uPx','uTile','uDeep','uScar','uWorld','uPulse'].concat(QU),['aA','aB']);
+  pSpk=prog(VS_SPK,FS_PTS,['uVP','uCam','uFocus','uAp','uPx'].concat(QU));
+  pScar=prog(VS_Q,FS_SCAR,['uS','uDt','uQ0','uQ1','uQ2','uQN','uT']);
+  pComp=prog(VS_Q,FS_COMP,['uHdr','uClk']);
+}catch(e){console.error(e);window.__fail();return;}
+
+var vaoPts=gl.createVertexArray();gl.bindVertexArray(vaoPts);
+var bA=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bA);gl.bufferData(gl.ARRAY_BUFFER,groups.A,gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,0,0);
+var bB=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bB);gl.bufferData(gl.ARRAY_BUFFER,groups.B,gl.STATIC_DRAW);
+gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,0,0);
+var vaoQ=gl.createVertexArray();gl.bindVertexArray(vaoQ);
+var bQ=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,bQ);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+var vaoNone=gl.createVertexArray();
+gl.bindVertexArray(null);
+
+function tex(w,h,mip){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mip?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}
+function fbo(t){var f=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,f);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('fbo');gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.bindFramebuffer(gl.FRAMEBUFFER,null);return f;}
+var SCW=1536,SCH=768,scar=[],scarF=[],cs=0,hdr=null,hdrF=null;
+try{for(var i=0;i<2;i++){scar[i]=tex(SCW,SCH,false);scarF[i]=fbo(scar[i]);}}catch(e){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+
+var CW=1,CH=1;
+function resize(){var dpr=Math.min(window.devicePixelRatio||1,1.5);
+  var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
+  if(w===CW&&h===CH&&hdr)return;CW=w;CH=h;canvas.width=w;canvas.height=h;
+  if(hdr){gl.deleteTexture(hdr);gl.deleteFramebuffer(hdrF);}
+  hdr=tex(w,h,true);hdrF=fbo(hdr);
+}
+window.addEventListener('resize',resize);resize();
+
+/* ---------- earthquakes ---------- */
+var simT=0,quakes=[];
+function relief(x,z){return .24*Math.sin(x*.53+z*.21)+.16*Math.sin(z*.71-x*.37+1.3)+.07*Math.sin(x*1.7+z*1.3+2)+.04*Math.sin(x*3.1-z*2.3);}
+function toWorld(lon,lat){return [(lon+180)/360*WX,(lat+90)/180*WZ];}
+function quake(lon,lat,depth,mag,follow){
+  var p=toWorld(lon,lat),y=-Math.min(depth,700)/700*DEEP+relief(p[0],p[1]);
+  var L=Math.min(2.2,.045*Math.pow(10,.5*(mag-4)));
+  var A=Math.min(30,Math.pow(10,.5*(mag-4)))*.35;
+  var shallow=Math.exp(-depth/25);
+  quakes.push({q0:[p[0],y,p[1],simT],q1:[Math.random()*Math.PI*2,(30+50*Math.random())*Math.PI/180,L,mag],
+    q2:[A,Math.min(1,.04+.25*Math.max(0,mag-3.5))*shallow,.6+.35*Math.min(3,Math.max(0,mag-4)),-Math.min(depth,700)/700*DEEP],end:simT+30+mag*4,mag:mag});
+  quakes.sort(function(a,b){return b.q0[3]-a.q0[3];});
+  /* keep the newest, but never drop a strong quake for a small one while it is still young */
+  if(quakes.length>NQ){quakes.sort(function(a,b){var sa=a.mag-(simT-a.q0[3])*.08,sb=b.mag-(simT-b.q0[3])*.08;return sb-sa;});quakes.length=NQ;}
+  if(follow!==false&&mag>=4.3)focusOn(p,y,mag);
+}
+var cam={tx:WX*.5,ty:-.3,tz:WZ*.6,x:WX*.5,y:-.3,z:WZ*.6,shake:0,ang:0};
+function focusOn(p,y,mag){cam.tx=p[0];cam.tz=p[1];cam.ty=Math.max(y*.5,-.9);cam.shake=Math.max(cam.shake,Math.min(1,(mag-4.5)/2.5));}
+
+var shown=null,queue=[],seen={},sim=false;
+function describe(e){return 'M '+e.mag.toFixed(1)+' · '+Math.round(e.depth)+' km deep · '+(e.place||'');}
+/* the planet's pulse: total seismic energy (proportional to 10^(1.5 M)) released in the last hour */
+var energy=[],lastT=0,replaying=false,pulse=0,pulseEl=document.getElementById('pulse');
+function addEnergy(e){var t=e.t||(Date.now());lastT=Math.max(lastT,t);energy.push({t:t,E:Math.pow(10,1.5*e.mag)});}
+function pulseTarget(){
+  var win=sim?90000:3600000,ref=(replaying||sim)?lastT:Math.max(lastT,Date.now());
+  energy=energy.filter(function(x){return x.t>ref-win;});
+  var E=energy.reduce(function(a,x){return a+x.E;},0);if(!E)return {lvl:0,m:0};
+  var m=Math.log10(E)/1.5;return {lvl:Math.min(1,Math.max(0,(m-4.)/3.)),m:m};
+}
+function deliver(e){
+  if(sim&&!e.t)e.t=Date.now();addEnergy(e);
+  quake(e.lon,e.lat,e.depth,e.mag);
+  if(!shown||e.mag>=shown.mag-.8||performance.now()-shown.at>20000){shown={mag:e.mag,at:performance.now()};readEl.textContent=describe(e);}
+}
+function ingest(feat){
+  var out=[];
+  (feat||[]).forEach(function(f){
+    if(!f||!f.id||seen[f.id])return;var p=f.properties||{},g=f.geometry&&f.geometry.coordinates;
+    if(!g||p.mag==null||(p.type&&p.type!=='earthquake'))return;seen[f.id]=1;
+    out.push({t:p.time,mag:+p.mag,lon:+g[0],lat:+g[1],depth:Math.max(0,+g[2]||0),place:p.place});
+  });
+  out.sort(function(a,b){return a.t-b.t;});return out;
+}
+var BASE='https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/';
+function getFeed(name){return fetch(BASE+name+'.geojson',{cache:'no-store'}).then(function(r){if(!r.ok)throw 0;return r.json();});}
+function startLive(){
+  getFeed('all_day').then(function(j){
+    dotEl.classList.add('live');
+    var ev=ingest(j.features),n=ev.length,span=Math.min(150,30+n*.35);
+    replaying=true;setTimeout(function(){replaying=false;},(span+2)*1000);
+    ev.forEach(function(e,i){queue.push({at:clock+1.5+span*(i/Math.max(1,n-1)),e:e});});
+    statusEl.textContent='Live from USGS · replaying the last 24 hours ('+n+' quakes)';
+    setTimeout(function(){statusEl.textContent='Live from USGS';},(span+3)*1000);
+    setInterval(poll,60000);
+  }).catch(function(){startSim();});
+}
+function poll(){
+  getFeed('all_hour').then(function(j){
+    var ev=ingest(j.features);
+    ev.forEach(function(e,i){queue.push({at:clock+1+55*(i/Math.max(1,ev.length)),e:e});});
+  }).catch(function(){statusEl.textContent='Waiting for USGS';});
+}
+var belts=[[-70,-30,8],[-72,-18,6],[-77,-2,5],[-90,13,5],[-104,18,5],[-118,35,4],[-125,42,3],[-152,59,6],[-175,51,6],[160,54,4],[142,40,5],[140,32,4],
+  [125,12,6],[126,1,5],[120,-8,7],[100,0,5],[95,4,4],[150,-6,5],[167,-15,5],[-175,-20,5],[-177,-32,4],[175,-40,4],[28,38,5],[45,35,5],[85,28,6],[-30,-60,10],[-28,62,6],[-17,30,10]];
+function startSim(){
+  if(sim)return;sim=true;statusEl.textContent='Preview with simulated earthquakes';
+  var nextAt=clock+.3,first=true,home=belts[14];
+  (function tick(){
+    var mag=2.4+(-Math.log(Math.random()))/Math.LN10*1.05;if(Math.random()<.04)mag=6+Math.random()*1.4;
+    if(first){mag=6.7;first=false;}
+    /* the preview stays mostly in one region so there is always something near */
+    var b=Math.random()<.65?home:belts[Math.floor(Math.random()*belts.length)];
+    var r=Math.random(),depth=r<.7?2+Math.random()*30:(r<.9?40+Math.random()*220:450+Math.random()*220);
+    queue.push({at:nextAt,e:{mag:Math.min(mag,8),lon:b[0]+(Math.random()-.5)*b[2]*1.2,lat:b[1]+(Math.random()-.5)*b[2]*1.2,depth:depth,place:'simulated'}});
+    nextAt+=.35+Math.random()*1.6;
+    setTimeout(tick,Math.max(50,(nextAt-clock)*1000-200));
+  })();
+}
+if(window.__framed&&Q.get('live')!=='1')startSim();else startLive();
+
+/* tap: a quake straight below where you touch */
+var VP=null,camPos=[0,0,0];
+canvas.addEventListener('pointerdown',function(ev){
+  if(!VP)return;var r=canvas.getBoundingClientRect();
+  var nx=((ev.clientX-r.left)/r.width)*2-1,ny=1-((ev.clientY-r.top)/r.height)*2;
+  var inv=invert(VP);var a=mulv(inv,[nx,ny,-1,1]),b=mulv(inv,[nx,ny,1,1]);
+  a=[a[0]/a[3],a[1]/a[3],a[2]/a[3]];b=[b[0]/b[3],b[1]/b[3],b[2]/b[3]];
+  var d=[b[0]-a[0],b[1]-a[1],b[2]-a[2]];if(Math.abs(d[1])<1e-6)return;var t=-a[1]/d[1];if(t<0)t=1;
+  var X=a[0]+d[0]*t,Z=a[2]+d[2]*t;var mag=5.6+Math.random()*.8;
+  quake(((X/WX)%1+1)%1*360-180,Z/WZ*180-90,6,mag,false);readEl.textContent='Your quake · M '+mag.toFixed(1)+' · 6 km deep';
+});
+window.__quake=function(mag,depth){quake(cam.tx/WX*360-180,cam.tz/WZ*180-90,depth==null?8:depth,mag||6.6,false);};
+window.__time=function(){return simT;};
+
+/* ---------- matrices ---------- */
+function persp(f,a,n,fa){var t=1/Math.tan(f/2);return [t/a,0,0,0,0,t,0,0,0,0,(fa+n)/(n-fa),-1,0,0,2*fa*n/(n-fa),0];}
+function lookAt(e,c,u){var z=norm([e[0]-c[0],e[1]-c[1],e[2]-c[2]]),x=norm(cross(u,z)),y=cross(z,x);
+  return [x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x,e),-dot(y,e),-dot(z,e),1];}
+function mul(a,b){var o=new Array(16);for(var i=0;i<4;i++)for(var j=0;j<4;j++){var s=0;for(var k=0;k<4;k++)s+=a[k*4+j]*b[i*4+k];o[i*4+j]=s;}return o;}
+function mulv(m,v){var o=[0,0,0,0];for(var j=0;j<4;j++)for(var k=0;k<4;k++)o[j]+=m[k*4+j]*v[k];return o;}
+function invert(m){var inv=new Array(16),i;
+  inv[0]=m[5]*m[10]*m[15]-m[5]*m[11]*m[14]-m[9]*m[6]*m[15]+m[9]*m[7]*m[14]+m[13]*m[6]*m[11]-m[13]*m[7]*m[10];
+  inv[4]=-m[4]*m[10]*m[15]+m[4]*m[11]*m[14]+m[8]*m[6]*m[15]-m[8]*m[7]*m[14]-m[12]*m[6]*m[11]+m[12]*m[7]*m[10];
+  inv[8]=m[4]*m[9]*m[15]-m[4]*m[11]*m[13]-m[8]*m[5]*m[15]+m[8]*m[7]*m[13]+m[12]*m[5]*m[11]-m[12]*m[7]*m[9];
+  inv[12]=-m[4]*m[9]*m[14]+m[4]*m[10]*m[13]+m[8]*m[5]*m[14]-m[8]*m[6]*m[13]-m[12]*m[5]*m[10]+m[12]*m[6]*m[9];
+  inv[1]=-m[1]*m[10]*m[15]+m[1]*m[11]*m[14]+m[9]*m[2]*m[15]-m[9]*m[3]*m[14]-m[13]*m[2]*m[11]+m[13]*m[3]*m[10];
+  inv[5]=m[0]*m[10]*m[15]-m[0]*m[11]*m[14]-m[8]*m[2]*m[15]+m[8]*m[3]*m[14]+m[12]*m[2]*m[11]-m[12]*m[3]*m[10];
+  inv[9]=-m[0]*m[9]*m[15]+m[0]*m[11]*m[13]+m[8]*m[1]*m[15]-m[8]*m[3]*m[13]-m[12]*m[1]*m[11]+m[12]*m[3]*m[9];
+  inv[13]=m[0]*m[9]*m[14]-m[0]*m[10]*m[13]-m[8]*m[1]*m[14]+m[8]*m[2]*m[13]+m[12]*m[1]*m[10]-m[12]*m[2]*m[9];
+  inv[2]=m[1]*m[6]*m[15]-m[1]*m[7]*m[14]-m[5]*m[2]*m[15]+m[5]*m[3]*m[14]+m[13]*m[2]*m[7]-m[13]*m[3]*m[6];
+  inv[6]=-m[0]*m[6]*m[15]+m[0]*m[7]*m[14]+m[4]*m[2]*m[15]-m[4]*m[3]*m[14]-m[12]*m[2]*m[7]+m[12]*m[3]*m[6];
+  inv[10]=m[0]*m[5]*m[15]-m[0]*m[7]*m[13]-m[4]*m[1]*m[15]+m[4]*m[3]*m[13]+m[12]*m[1]*m[7]-m[12]*m[3]*m[5];
+  inv[14]=-m[0]*m[5]*m[14]+m[0]*m[6]*m[13]+m[4]*m[1]*m[14]-m[4]*m[2]*m[13]-m[12]*m[1]*m[6]+m[12]*m[2]*m[5];
+  inv[3]=-m[1]*m[6]*m[11]+m[1]*m[7]*m[10]+m[5]*m[2]*m[11]-m[5]*m[3]*m[10]-m[9]*m[2]*m[7]+m[9]*m[3]*m[6];
+  inv[7]=m[0]*m[6]*m[11]-m[0]*m[7]*m[10]-m[4]*m[2]*m[11]+m[4]*m[3]*m[10]+m[8]*m[2]*m[7]-m[8]*m[3]*m[6];
+  inv[11]=-m[0]*m[5]*m[11]+m[0]*m[7]*m[9]+m[4]*m[1]*m[11]-m[4]*m[3]*m[9]-m[8]*m[1]*m[7]+m[8]*m[3]*m[5];
+  inv[15]=m[0]*m[5]*m[10]-m[0]*m[6]*m[9]-m[4]*m[1]*m[10]+m[4]*m[2]*m[9]+m[8]*m[1]*m[6]-m[8]*m[2]*m[5];
+  var det=m[0]*inv[0]+m[1]*inv[4]+m[2]*inv[8]+m[3]*inv[12];det=1/det;for(i=0;i<16;i++)inv[i]*=det;return inv;}
+function norm(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
+function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+
+function setQ(P){
+  var a=new Float32Array(NQ*4),b=new Float32Array(NQ*4),c=new Float32Array(NQ*4);
+  quakes.forEach(function(q,i){a.set(q.q0,i*4);b.set(q.q1,i*4);c.set(q.q2,i*4);});
+  gl.uniform4fv(P.u.uQ0,a);gl.uniform4fv(P.u.uQ1,b);if(P.u.uQ2)gl.uniform4fv(P.u.uQ2,c);gl.uniform1i(P.u.uQN,quakes.length);gl.uniform1f(P.u.uT,simT);
+}
+
+/* ---------- loop ---------- */
+var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var clock=0,last=performance.now(),started=false;
+function frame(now){
+  requestAnimationFrame(frame);
+  resize();
+  var rdt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;clock+=rdt;
+  var dt=rdt*(calm?.5:1);simT+=dt;
+  while(queue.length&&queue[0].at<=clock)deliver(queue.shift().e);
+  queue.sort(function(a,b){return a.at-b.at;});
+  quakes=quakes.filter(function(q){return q.end>simT;});
+  var pt=pulseTarget();pulse+=(pt.lvl-pulse)*(1-Math.pow(.7,rdt));
+  if(pulseEl&&Math.floor(clock*2)!==Math.floor((clock-rdt)*2))pulseEl.textContent=pt.m>0?(sim?'Last 90 s (preview)':'Last hour')+': as much energy as one M '+pt.m.toFixed(1)+' quake':'\u00a0';
+  if(!started&&quakes.length){var q=quakes[0].q0;cam.x=cam.tx=q[0];cam.z=cam.tz=q[2];started=true;}
+
+  /* scars */
+  gl.disable(gl.BLEND);gl.bindVertexArray(vaoQ);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,scarF[1-cs]);gl.viewport(0,0,SCW,SCH);gl.useProgram(pScar.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,scar[cs]);gl.uniform1i(pScar.u.uS,0);gl.uniform1f(pScar.u.uDt,dt);setQ(pScar);
+  gl.drawArrays(gl.TRIANGLES,0,3);cs=1-cs;
+
+  /* camera: circles the target, drifting down through the layers and back up */
+  var dx=cam.tx-cam.x;dx-=Math.round(dx/WX)*WX;var k=1-Math.pow(.55,rdt);
+  cam.x+=dx*k*.6;cam.z+=(cam.tz-cam.z)*k*.6;cam.y+=(cam.ty-cam.y)*k*.3;
+  cam.ang+=rdt*(.045+.02*Math.sin(clock*.05));cam.shake*=Math.pow(.3,rdt);
+  /* the camera drifts down into the mantle and back up above the crust, about every two minutes */
+  var R=1.55+.35*Math.sin(clock*.031),hgt=.95*Math.sin(clock*.05+(Q.get('dive')?4.7:.6))-.05;
+  var js=cam.shake*.012,jx=(Math.sin(clock*37.)+Math.sin(clock*23.1))*js,jy=(Math.sin(clock*31.7)+Math.sin(clock*41.3))*js;
+  var eye=[cam.x+Math.cos(cam.ang)*R+jx,cam.y+hgt+.35+jy,cam.z+Math.sin(cam.ang)*R];
+  var ctr=[cam.x,cam.y-.05+.15*Math.sin(clock*.023),cam.z];
+  var proj=persp(.95,CW/CH,.02,40),view=lookAt(eye,ctr,[0,1,0]);VP=mul(proj,view);camPos=eye;
+  var focus=Math.hypot(eye[0]-ctr[0],eye[1]-ctr[1],eye[2]-ctr[2]);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,hdrF);gl.viewport(0,0,CW,CH);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE);
+  var px=Math.max(1.,CH/700)*1.25,ap=CH*.045;
+  gl.useProgram(pPts.p);gl.bindVertexArray(vaoPts);
+  gl.uniformMatrix4fv(pPts.u.uVP,false,new Float32Array(VP));gl.uniform3f(pPts.u.uCam,eye[0],eye[1],eye[2]);
+  gl.uniform1f(pPts.u.uFocus,focus);gl.uniform1f(pPts.u.uAp,ap);gl.uniform1f(pPts.u.uPx,px);gl.uniform1f(pPts.u.uTile,T);gl.uniform1f(pPts.u.uDeep,DEEP);
+  gl.uniform2f(pPts.u.uWorld,WX,WZ);gl.uniform1f(pPts.u.uPulse,pulse);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,scar[cs]);gl.uniform1i(pPts.u.uScar,0);setQ(pPts);
+  gl.drawArrays(gl.POINTS,0,groups.total);
+  gl.useProgram(pSpk.p);gl.bindVertexArray(vaoNone);
+  gl.uniformMatrix4fv(pSpk.u.uVP,false,new Float32Array(VP));gl.uniform3f(pSpk.u.uCam,eye[0],eye[1],eye[2]);
+  gl.uniform1f(pSpk.u.uFocus,focus);gl.uniform1f(pSpk.u.uAp,ap);gl.uniform1f(pSpk.u.uPx,px);setQ(pSpk);
+  gl.drawArrays(gl.POINTS,0,NSPARK);
+  gl.disable(gl.BLEND);
+  gl.bindTexture(gl.TEXTURE_2D,hdr);gl.generateMipmap(gl.TEXTURE_2D);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,CW,CH);gl.useProgram(pComp.p);gl.bindVertexArray(vaoQ);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,hdr);gl.uniform1i(pComp.u.uHdr,0);gl.uniform1f(pComp.u.uClk,clock);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
