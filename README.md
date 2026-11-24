@@ -15,7 +15,7 @@ Generative artworks by Valentina Contini that run live in the browser and answer
 
 ## How it's built
 
-Each work is a single self-contained `index.html` with hand-written WebGL 2 shaders: no build step, no libraries, no AI or paid services. The site is plain static files served by GitHub Pages.
+Each work is a single self-contained `index.html` with WebGL 2 shaders and simulations, conceived and directed by Valentina Contini and coded together with Claude (Anthropic). No build step, no libraries; nothing at runtime uses AI or paid services. The site is plain static files served by GitHub Pages.
 
 ## Adding a work
 
