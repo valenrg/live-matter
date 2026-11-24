@@ -48,7 +48,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 <div class="ui" id="ui">
   <div class="placard">
     <h1>Aphelion Drift</h1>
-    <p><span id="hint">Orbits and resonance &middot; drag to turn the disc &middot; it listens to the room</span></p>
+    <p><span id="hint">Orbits and resonance &middot; drag to turn the disc &middot; it listens to the room: hum a note</span></p>
   </div>
   <div class="controls">
     <a class="btn back" href="../">&larr; Live Matter</a>
@@ -76,14 +76,20 @@ if(!gl){fail();return;}
    high frequencies near the centre, the way moons carve gaps in planetary rings. A clap sends a shockwave outward. */
 var VS_P=['#version 300 es','precision highp float;',
 'in vec4 aP;out vec3 vCol;',
-'uniform float uT,uAsp,uPx,uGain,uHigh,uShockR,uShockA,uFocus,uTanH,uWarp,uBreath,uClk;uniform vec3 uGapR,uGapA,uCam;uniform mat3 uRot;',
+'uniform float uT,uAsp,uPx,uGain,uHigh,uShockR,uShockA,uFocus,uTanH,uWarp,uBreath,uClk;uniform vec3 uGapR,uGapA,uCam;uniform vec2 uV;uniform mat3 uRot;uniform float uArm,uDust;uniform vec4 uTid;',
+'float hh(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
 'void main(){',
 ' float r=aP.x,th0=aP.y,s1=aP.z,s2=aP.w;',
 ' float w=.32*pow(r,-1.5);float th=th0+w*uT;',
 ' float e=.07*s2*s2;float re=r*(1.-e*cos(th-s1*6.2831));',
-' re+=.04*r*sin(2.*th-uT*.04+3.2*log(r));',
-' float bright=1.;',
+' re+=.04*r*sin(2.*th-uT*.04+3.2*log(r))*(1.+1.8*uArm);',
+' float bright=1.;float lift=0.;',
+' if(uTid.z>0.){float ts=uT-uTid.x;float env=smoothstep(-4.,4.,ts)*exp(-max(ts,0.)/80.);',
+'  float th0=th-w*max(ts,0.);float a=th0-uTid.y;float A=uTid.z*env*pow(min(r,4.6)/3.,2.);',
+'  float bridge=max(cos(a),0.);bridge*=bridge;',
+'  re+=A*(.30*cos(2.*a)+.55*bridge)*r*.38;th+=A*.30*sin(2.*a);lift=A*bridge*r*.10;bright+=A*bridge*.8;}',
 ' for(int i=0;i<3;i++){float R=uGapR[i],A=uGapA[i],wd=.05+.035*R;float d=(r-R)/wd;re+=A*wd*1.9*d*exp(-d*d);bright+=A*.8*exp(-pow(abs(d)-1.,2.)*3.);}',
+' {float wd=.05+.035*uV.x;float d=(r-uV.x)/wd;re+=uV.y*wd*2.2*d*exp(-d*d);bright+=uV.y*1.6*exp(-pow(abs(d)-1.,2.)*3.);}',
 ' float ds=(r-uShockR)/.07;re+=uShockA*.09*exp(-ds*ds);bright+=uShockA*2.5*exp(-ds*ds);',
 ' /* third dimension: every star also orbits vertically through the plane, faster than it goes round (nu ~ 1.7 omega) */',
 ' float zA=(.012+.05*s2*s2)*r*(1.+uBreath*1.6);',
@@ -98,14 +104,14 @@ var VS_P=['#version 300 es','precision highp float;',
 ' for(int i=0;i<3;i++){float d=(r-uGapR[i])/(.06+.04*uGapR[i]);y+=uGapA[i]*.10*uGapR[i]*.4*exp(-d*d)*sin(3.*th+s1*12.+uClk*.6);}',
 ' /* a sound onset lifts the shock ring like a wave on a sheet */',
 ' y+=uShockA*.16*exp(-pow((r-uShockR)/.18,2.))*(1.+.4*sin(th*2.+s1));',
-' vec3 P=vec3(re*cos(th),y,re*sin(th));',
+' y+=lift;vec3 P=vec3(re*cos(th),y,re*sin(th));',
 ' vec3 v=uRot*(P-uCam);',
 ' if(v.z<.06){gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=0.;vCol=vec3(0.);return;}',
 ' gl_Position=vec4(v.x/(v.z*uTanH*uAsp),v.y/(v.z*uTanH),0.,1.);',
 ' bool star=s1>.986;',
 ' float base=max(1.,uPx*.0019/v.z*mix(.6,1.4,s2)*(star?2.:1.));',
-' float coc=abs(v.z-uFocus)/v.z*uPx*.010;',
-' float size=min(base+coc,22.);gl_PointSize=size;',
+' float coc=abs(v.z-uFocus)/v.z*uPx*.017;',
+' float size=min(base+coc,32.);gl_PointSize=size;',
 ' float t=smoothstep(.2,4.2,r);',
 ' float arm=.5+.5*sin(2.*th-uT*.04+3.2*log(r));',
 ' float c=clamp(t*.75+arm*.42+(s1-.5)*.3-.1,0.,1.);',
@@ -114,8 +120,17 @@ var VS_P=['#version 300 es','precision highp float;',
 ' col=mix(col,violet,smoothstep(.55,.95,c));',
 ' col=mix(col,mix(rose,cyan,s2),.25*s1);',
 ' if(star)col=mix(gold,vec3(1.),.45)*(2.5+6.*uHigh);',
-' float dens=mix(1.6,.7,t)*(.45+1.1*arm*arm)*smoothstep(.12,.45,r);',
-' vCol=col*uGain*dens*bright*(base*base)/(size*size)*mix(.6,1.4,s1)*smoothstep(.06,.4,v.z);',
+/* star formation: where an arm compresses the disc, clusters of young blue-white stars ignite, then fade as the
+   arm moves on (they burn out long before they could drift far) */
+' float young=0.;',
+' if(s1>.78&&s1<.86){vec2 cell=floor(vec2((th-uT*.0)*1.9,log(r)*7.));float ph=hh(cell);',
+'  float life=fract(uClk*(.035+.03*hh(cell+3.))+ph);float burst=smoothstep(0.,.06,life)*(1.-smoothstep(.12,.5,life));',
+'  young=burst*smoothstep(.62,.92,arm)*smoothstep(.5,1.2,r);',
+'  col=mix(col,vec3(.62,.80,1.)*3.2,young);}',
+' float dens=mix(1.6,.7,t)*(.45+1.1*arm*arm)*smoothstep(.12,.45,r)*mix(1.,.45+1.5*pow(arm,3.),uArm);',
+' vCol=col*uGain*dens*bright*(base*base)/(size*size)*mix(.6,1.4,s1)*smoothstep(.04,.25,v.z)*(1.+young*5.);',
+' if(uDust>.5){float lane=.5+.5*sin(2.*th-uT*.04+3.2*log(r)+.75);float dl=smoothstep(.72,.95,lane)*smoothstep(.5,1.,r)*(1.-smoothstep(3.6,4.6,r))*(.5+.7*uArm);',
+'  vCol=vec3(dl*(base*base)/(size*size)*smoothstep(.04,.25,v.z)*.9);}',
 '}'].join('\n');
 var FS_P=['#version 300 es','precision mediump float;','in vec3 vCol;out vec4 o;',
 'void main(){float d=length(gl_PointCoord-.5);o=vec4(vCol*smoothstep(.5,.1,d),1.);}'].join('\n');
@@ -123,11 +138,12 @@ var FS_P=['#version 300 es','precision mediump float;','in vec3 vCol;out vec4 o;
 /* Full bleed: the light of the disc on deep space, with its own glow, no room around it. */
 var VS='#version 300 es\nin vec2 aPos;out vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
 var FS_C=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
-'uniform sampler2D uAcc;uniform float uT;',
+'uniform sampler2D uAcc,uDust;uniform float uT;',
 'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
 'void main(){',
 ' vec3 a=texture(uAcc,vUv).rgb;',
-' vec3 bloom=textureLod(uAcc,vUv,2.5).rgb*.40+textureLod(uAcc,vUv,4.5).rgb*.50+textureLod(uAcc,vUv,6.5).rgb*.55;',
+' float du=textureLod(uDust,vUv,1.2).r;float ab=exp(-du*4.2);',
+' vec3 bloom=textureLod(uAcc,vUv,2.5).rgb*.40+textureLod(uAcc,vUv,4.5).rgb*.50+textureLod(uAcc,vUv,6.5).rgb*.55;a*=ab;bloom*=mix(1.,ab,.6);',
 ' vec3 col=vec3(.0035,.0032,.006)+a+bloom;',
 ' col*=1.25;',
 ' col=clamp((col*(2.51*col+.03))/(col*(2.43*col+.59)+.14),0.,1.);',
@@ -145,8 +161,20 @@ function prog(vs,fs,attr){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTE
   var u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
   for(var i=0;i<n;i++){var info=gl.getActiveUniform(p,i);u[info.name.replace('[0]','')]=gl.getUniformLocation(p,info.name);}
   return {p:p,u:u};}
-var pPart,pComp;
-try{pPart=prog(VS_P,FS_P,'aP');pComp=prog(VS,FS_C,'aPos');}catch(err){fail();return;}
+/* the companion: a small, round, older galaxy (warm light), passing on its own path */
+var VS_K=['#version 300 es','precision highp float;','in vec4 aP;out vec3 vCol;',
+'uniform float uAsp,uPx,uGain,uFocus,uTanH,uClk;uniform vec4 uComp;uniform vec3 uCam;uniform mat3 uRot;',
+'void main(){',
+' float a=aP.y+uClk*.05/(.3+aP.x);float c_=aP.z*2.-1.,s_=sqrt(1.-c_*c_);vec3 o=vec3(cos(a)*s_,c_*.8,sin(a)*s_)*aP.x*.6;',
+' vec3 P=uComp.xyz+o;vec3 v=uRot*(P-uCam);',
+' if(v.z<.06||uComp.w<=0.){gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=0.;vCol=vec3(0.);return;}',
+' gl_Position=vec4(v.x/(v.z*uTanH*uAsp),v.y/(v.z*uTanH),0.,1.);',
+' float base=max(1.,uPx*.0019/v.z);float coc=abs(v.z-uFocus)/v.z*uPx*.017;float size=min(base+coc,32.);gl_PointSize=size;',
+' vec3 col=mix(vec3(1.,.78,.42),vec3(1.,.42,.48),aP.w);',
+' vCol=col*uGain*2.2*uComp.w*(base*base)/(size*size)*exp(-aP.x*1.6)*smoothstep(.06,.4,v.z);',
+'}'].join('\n');
+var pPart,pComp,pK;
+try{pPart=prog(VS_P,FS_P,'aP');pComp=prog(VS,FS_C,'aPos');pK=prog(VS_K,FS_P,'aP');}catch(err){fail();return;}
 
 var small=Math.min(window.screen.width,window.screen.height)<700;
 var N=small?180000:360000;
@@ -155,6 +183,11 @@ var data=new Float32Array(N*4);
 for(var i=0;i<N;i++){var u=Math.random();data[i*4]=.14+4.6*Math.pow(u,1.7);data[i*4+1]=Math.random()*6.2831;data[i*4+2]=Math.random();data[i*4+3]=Math.random();}
 var pVao=gl.createVertexArray(),pBuf=gl.createBuffer();
 gl.bindVertexArray(pVao);gl.bindBuffer(gl.ARRAY_BUFFER,pBuf);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,0,0);
+var NK=small?14000:30000,kd=new Float32Array(NK*4);
+for(var i=0;i<NK;i++){var u_=Math.random();kd[i*4]=Math.pow(u_,1.6)*1.6;kd[i*4+1]=Math.random()*6.2831;kd[i*4+2]=Math.random();kd[i*4+3]=Math.random();}
+var kVao=gl.createVertexArray(),kBuf=gl.createBuffer();
+gl.bindVertexArray(kVao);gl.bindBuffer(gl.ARRAY_BUFFER,kBuf);gl.bufferData(gl.ARRAY_BUFFER,kd,gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,4,gl.FLOAT,false,0,0);
 var triVao=gl.createVertexArray(),triBuf=gl.createBuffer();
 gl.bindVertexArray(triVao);gl.bindBuffer(gl.ARRAY_BUFFER,triBuf);
@@ -175,14 +208,14 @@ function makeTarget(w,h){
   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE&&useFloat){useFloat=false;gl.deleteTexture(tex);gl.deleteFramebuffer(fb);return makeTarget(w,h);}
   return {tex:tex,fb:fb,w:w,h:h};
 }
-var W=1,H=1,gain=.2;
+var W=1,H=1,gain=.2,dust=null;
 function resize(){
   var dpr=Math.min(window.devicePixelRatio||1,2);
   var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
   if(w===W&&h===H&&acc)return;
   W=w;H=h;canvas.width=w;canvas.height=h;
-  if(acc){gl.deleteTexture(acc.tex);gl.deleteFramebuffer(acc.fb);}
-  acc=makeTarget(w,h);
+  if(acc){gl.deleteTexture(acc.tex);gl.deleteFramebuffer(acc.fb);gl.deleteTexture(dust.tex);gl.deleteFramebuffer(dust.fb);}
+  acc=makeTarget(w,h);dust=makeTarget(Math.max(1,w>>1),Math.max(1,h>>1));
   gain=Math.max(.04,Math.min(.6,.30*(w*h)/(N*9)));
 }
 window.addEventListener('resize',resize);resize();
@@ -257,7 +290,7 @@ if(!framed&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
     if(actx.state==='suspended')actx.resume();
     navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}}).then(function(stream){
       micStream=stream;micSrc=actx.createMediaStreamSource(stream);micSrc.connect(analyser);
-      micOn=true;micBtn.textContent='Microphone on';hint.textContent='Listening. Speak, clap or make noise';
+      micOn=true;micBtn.textContent='Microphone on';hint.textContent='Listening · hum or sing: the pitch chooses which orbit answers · clap for a shockwave';
     }).catch(function(){hint.textContent='Microphone was blocked. Allow it in the browser settings and tap again';});
   });
 }else{
@@ -268,6 +301,15 @@ function norm(x,st){
   st.floor+=(x-st.floor)*(x<st.floor?.08:.0008);
   st.peak=Math.max(st.peak*.9995,x,st.floor+.04);
   return Math.max(0,Math.min(1,(x-st.floor*1.3)/(st.peak-st.floor)));
+}
+var voice={r:2,a:0,held:0};
+function pitchOf(buf,sr){
+  var n=buf.length,minL=Math.floor(sr/1000),maxL=Math.min(n>>1,Math.floor(sr/80)),best=0,bestL=0,e0=0,i;
+  for(i=0;i<n;i++){var x=(buf[i]-128)/128;e0+=x*x;}if(e0<1e-3)return 0;
+  for(var L=minL;L<=maxL;L++){var c=0;for(i=0;i<n-L;i+=2)c+=(buf[i]-128)*(buf[i+L]-128);c/=((n-L)>>1);
+    if(c>best){best=c;bestL=L;}}
+  var norm_=best/(e0/n*16384);
+  return norm_>.5&&bestL>0?sr/bestL:0;
 }
 function readAudio(dt){
   var live=analyser&&(micOn||!audioEl.paused);
@@ -282,6 +324,13 @@ function readAudio(dt){
     snd.peak=Math.max(snd.peak*.9995,rms,snd.floor+.03);
     lvl=Math.max(0,Math.min(1,(rms-snd.floor*1.4)/(snd.peak-snd.floor)));
   }
+  /* pitch: for a sung or hummed note, the strongest repeating period in the waveform */
+  var f0=0;
+  if(live&&lvl>.18){f0=pitchOf(wave,actx.sampleRate);}
+  if(f0>0){var rT=3.2*Math.pow(f0/150,-2/3);          /* the radius whose orbital frequency matches: r grows as f^-2/3 (Kepler) */
+    rT=Math.max(.55,Math.min(4.2,rT));voice.r+=(rT-voice.r)*(voice.a<.05?1:.12);voice.held=Math.min(1,voice.held+dt*1.5);}
+  else voice.held=Math.max(0,voice.held-dt*1.2);
+  voice.a+=((voice.held>0?Math.min(1,.35+lvl*.9):0)-voice.a)*(voice.held>0?.08:.03);
   lv.bass+=(b-lv.bass)*(b>lv.bass?.05:.025);
   lv.mid+=(m-lv.mid)*(m>lv.mid?.04:.02);
   lv.high+=(h-lv.high)*(h>lv.high?.05:.025);
@@ -293,10 +342,10 @@ function readAudio(dt){
 
 var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var simT=Math.random()*400,clock=0,last=performance.now();
-var gapA=[0,0,0],warp=.5,breath=0;
+var armLv=0,enc=null,nextEnc=/[?&]enc/.test(location.search)?2:55,tid=[-1e4,0,0,0],gapA=[0,0,0],warp=.5,breath=0,fly=0,flyOff=/[?&]fly=/.test(location.search)?parseFloat(location.search.split('fly=')[1])*120:Math.random()*40;
 function drift(t,k){return .5+.25*Math.sin(t*.031*k+k*1.7)+.15*Math.sin(t*.0173*k+k*4.1)+.10*Math.sin(t*.071*k+k*.6);}
 function frame(now){
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame);window.__clk=clock;
   resize();
   var rdt=Math.min(.05,(now-last)/1000);last=now;clock+=rdt;
   readAudio(rdt);
@@ -304,20 +353,43 @@ function frame(now){
   var dt=rdt*(calm?.35:1);
   simT+=dt*(1+lv.mid*1.2);
   /* gaps breathe on their own; sound opens them wider */
-  var tg=[.22+.18*drift(clock,1.7)+lv.bass*.9,.18+.16*drift(clock,2.3)+lv.mid*.9,.14+.12*drift(clock,3.1)+lv.high*.9];
+  var tg=[.22+.18*drift(clock,1.7)+lv.bass*.6,.18+.16*drift(clock,2.3)+lv.mid*.6,.14+.12*drift(clock,3.1)+lv.high*.6];
   for(var g=0;g<3;g++)gapA[g]+=(Math.min(1.1,tg[g])-gapA[g])*.04;
   shockR+=rdt*1.1;shockA*=Math.pow(.45,rdt);
   /* the warp grows and relaxes on its own; low sound swells the disc's thickness */
   warp+=((.35+.45*drift(clock,.9)+lv.bass*.5)-warp)*.01;
   breath+=((lv.bass*.7+lv.mid*.4)-breath)*.03;
+  /* a held note or chord slowly feeds the spiral arms; silence lets them relax */
+  armLv+=((snd.slow>.25?Math.min(1,snd.slow*1.4):0)-armLv)*(1-Math.exp(-rdt/(snd.slow>.25?4:9)));
+  /* every few minutes a small companion galaxy passes; its pull at closest approach raises a tidal tail and a bridge */
+  if(!enc&&clock>nextEnc){var ph0=Math.atan2(-Math.cos(view.yaw),Math.sin(view.yaw))+Math.PI+(Math.random()-.5)*1.1,b0=5.2,sp=.33,dir=Math.random()<.5?1:-1;
+    enc={t0:clock,tc:clock+(/enc=now/.test(location.search)?.5:26),ph:ph0,b:b0,sp:sp,dir:dir,h:.9+.6*Math.random(),tp:null};hint.textContent='An unseen galaxy is passing · its gravity pulls the disc into tidal arms';}
+  var compPos=[0,0,0],compA=0,encClose=0;
+  if(enc){var tt=clock-enc.tc;var bx=Math.cos(enc.ph)*enc.b,bz=Math.sin(enc.ph)*enc.b;var vx=-Math.sin(enc.ph)*enc.dir,vz=Math.cos(enc.ph)*enc.dir;
+    var bend=1+.0016*tt*tt;
+    compPos=[bx*bend+vx*enc.sp*tt,enc.h*bend,bz*bend+vz*enc.sp*tt];
+    compA=Math.min(1,Math.max(0,1-Math.abs(tt)/34));compA=compA*compA*(3-2*compA);
+    encClose=Math.max(0,1-Math.abs(tt)/40);
+    if(enc.tp===null&&tt>=0){enc.tp=simT;tid=[simT,enc.ph,1.,0];}
+    if(tt>40){enc=null;nextEnc=clock+200+Math.random()*80;hint.textContent=micOn?'Listening · hum or sing: the pitch chooses which orbit answers · clap for a shockwave':'Orbits and resonance · drag to turn the disc · it listens to the room: hum a note';}}
   /* camera drifts slowly round the disc */
   var sway=calm?.3:1;
-  view.yaw+=dt*.012*sway;
+  /* the flight: about every two minutes the camera leaves the overview, descends into the disc, skims along the
+     arms (near stars slide past far ones), dips just below the plane to see it from beneath, and climbs back out */
+  view.yaw+=dt*(.012+.03*fly)*sway;
+  var cyc=(clock+flyOff)/120,ph_=cyc-Math.floor(cyc);
+  var close=Math.pow(Math.max(0,Math.sin(Math.PI*ph_)),2.2)*sway*(1-(typeof encClose==='number'?encClose:0));      /* 0 overview .. 1 deepest; back out while a companion passes */
+  fly+=(close-fly)*Math.min(1,rdt*.6);
+  var dip=Math.max(0,Math.sin(Math.PI*Math.min(1,Math.max(0,(ph_-.42)/.16))));    /* a short passage below the plane */
   var yaw=view.yaw+view.dy+view.look[0]*.05;
-  var tilt=Math.max(.08,Math.min(1.2,view.tilt+view.dt+Math.sin(clock*.02)*.05*sway-view.look[1]*.03));
-  var cx=Math.sin(yaw)*Math.cos(tilt)*view.dist,cz=-Math.cos(yaw)*Math.cos(tilt)*view.dist,cy=Math.sin(tilt)*view.dist;
-  /* look at a point a little in front of the centre, so the disc fills the frame */
-  var tx=-cx*.2,tz=-cz*.2,ty=0;
+  var tilt=Math.max(-.35,Math.min(1.2,view.tilt*(1-.85*fly)+.04*fly-.20*dip*fly+view.dt+Math.sin(clock*.02)*.05*sway-view.look[1]*.03));
+  var dist=view.dist*(1-.62*fly)*(1+.55*encClose);
+  /* the point looked at moves out along the disc as the camera comes in, so it travels over the arms, not into the core */
+  var tr_=1.6*fly,ta=yaw+1.2;
+  var tx=Math.sin(ta)*tr_,tz=-Math.cos(ta)*tr_,ty=0;
+  var cx=tx+Math.sin(yaw)*Math.cos(tilt)*dist,cz=tz-Math.cos(yaw)*Math.cos(tilt)*dist,cy=Math.sin(tilt)*dist;
+  if(fly<.02){tx=-cx*.2;tz=-cz*.2;}
+
   var f=[tx-cx,ty-cy,tz-cz],fl=Math.hypot(f[0],f[1],f[2]);f=[f[0]/fl,f[1]/fl,f[2]/fl];
   var rgt=[f[2],0,-f[0]],rl=Math.hypot(rgt[0],rgt[2]);rgt=[rgt[0]/rl,0,rgt[2]/rl];
   var upv=[f[1]*rgt[2]-f[2]*rgt[1],f[2]*rgt[0]-f[0]*rgt[2],f[0]*rgt[1]-f[1]*rgt[0]];
@@ -331,14 +403,27 @@ function frame(now){
   gl.uniform1f(u.uT,simT);gl.uniform1f(u.uAsp,W/H);gl.uniform1f(u.uPx,H);gl.uniform1f(u.uGain,gain*(1+lv.bass*.6));
   gl.uniform1f(u.uHigh,lv.high);gl.uniform1f(u.uWarp,warp);gl.uniform1f(u.uBreath,breath);gl.uniform1f(u.uClk,clock);gl.uniform1f(u.uShockR,shockR);gl.uniform1f(u.uShockA,shockA);
   gl.uniform1f(u.uFocus,fl*.85);gl.uniform1f(u.uTanH,.62);
-  gl.uniform3f(u.uGapR,3.1,1.9,.95);gl.uniform3f(u.uGapA,gapA[0],gapA[1],gapA[2]);
+  gl.uniform3f(u.uGapR,3.1,1.9,.95);gl.uniform2f(u.uV,voice.r,voice.a);gl.uniform3f(u.uGapA,gapA[0],gapA[1],gapA[2]);
   gl.uniform3f(u.uCam,cx,cy,cz);gl.uniformMatrix3fv(u.uRot,false,rot);
+  gl.uniform1f(u.uArm,armLv);gl.uniform4f(u.uTid,tid[0],tid[1],tid[2],tid[3]);gl.uniform1f(u.uDust,0);
+  gl.bindVertexArray(pVao);gl.drawArrays(gl.POINTS,0,N);
+  /* the companion itself is not drawn: only its pull on the disc is shown */
+  if(false){gl.useProgram(pK.p);var uk=pK.u;
+  gl.uniform1f(uk.uAsp,W/H);gl.uniform1f(uk.uPx,H);gl.uniform1f(uk.uGain,gain);gl.uniform1f(uk.uFocus,fl*.85);gl.uniform1f(uk.uTanH,.62);gl.uniform1f(uk.uClk,clock);
+  gl.uniform4f(uk.uComp,compPos[0],compPos[1],compPos[2],compA);gl.uniform3f(uk.uCam,cx,cy,cz);gl.uniformMatrix3fv(uk.uRot,false,rot);
+  gl.bindVertexArray(kVao);gl.drawArrays(gl.POINTS,0,NK);}
+  gl.useProgram(pPart.p);
+  /* dust: the same grains, laying down absorption along the arms' leading edges */
+  gl.bindFramebuffer(gl.FRAMEBUFFER,dust.fb);gl.viewport(0,0,dust.w,dust.h);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(pPart.p);gl.uniform1f(u.uDust,1);gl.uniform1f(u.uPx,dust.h);
   gl.bindVertexArray(pVao);gl.drawArrays(gl.POINTS,0,N);
   gl.disable(gl.BLEND);
+  gl.bindTexture(gl.TEXTURE_2D,dust.tex);gl.generateMipmap(gl.TEXTURE_2D);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,W,H);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,acc.tex);gl.generateMipmap(gl.TEXTURE_2D);
   gl.useProgram(pComp.p);gl.bindVertexArray(triVao);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,dust.tex);gl.uniform1i(pComp.u.uDust,1);gl.activeTexture(gl.TEXTURE0);
   gl.uniform1i(pComp.u.uAcc,0);gl.uniform1f(pComp.u.uT,clock);
   gl.drawArrays(gl.TRIANGLES,0,3);
   gl.bindVertexArray(null);

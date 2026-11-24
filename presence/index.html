@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Presence</title>
-<meta name="description" content="A room of slow smoke that only you can disturb. The camera sees movement only; nothing is recorded.">
-<meta name="theme-color" content="#08080b">
+<meta name="description" content="The air over one place on Earth, right now, as a room of smoke you can step into. The camera sees movement only; nothing is recorded.">
+<meta name="theme-color" content="#060608">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
 :root{
   /* Layout: full-screen canvas, museum placard bottom-left, quiet controls bottom-right. Single dark world by choice. */
-  --wall:#08080b;
+  --wall:#060608;
   --ink:#ecebf2;
   --ink-dim:#8d8b9c;
   --line:rgba(236,235,242,.18);
@@ -37,20 +37,22 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn[hidden]{display:none}
 a.btn{text-decoration:none;display:inline-flex;align-items:center}
-.fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:#08080b}
+.fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:radial-gradient(circle at 50% 30%,#2a2833,#060608 70%)}
 .fallback p{max-width:40ch;background:var(--glass);padding:14px 18px;border-radius:12px;border:1px solid var(--line)}
 @media (prefers-reduced-motion:reduce){.ui{transition:none}}
-
+.meta{display:flex;align-items:center;gap:8px}.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex:none}.dot.live{background:#9fe0c8}.placard p.tick{margin-top:4px;text-transform:none;letter-spacing:.02em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(70ch,calc(100vw - 32px))}
 </style>
 </head>
 <body>
-<canvas id="c" aria-label="Generative artwork: pale smoke drifting in a dark room, stirred by the visitor's movement"></canvas>
+<canvas id="c" aria-label="Generative artwork: a room of slow smoke lit from above, moved by the live wind and temperature profile over a place on Earth, and stirred by the visitor's movement"></canvas>
 <div class="fallback" id="fallback"><p id="fallbackText">This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
 
 <div class="ui" id="ui">
   <div class="placard">
     <h1>Presence</h1>
-    <p><span id="status">Move your pointer or finger through the smoke</span></p>
+    <p class="meta"><span class="dot" id="dot"></span><span><span id="place">Air</span> &middot; <span id="status">Connecting to Open-Meteo</span></span></p>
+    <p class="tick" id="read">&nbsp;</p>
+    <p>Wind and temperature from the ground to 180 m &middot; drag through the smoke &middot; weather data Open-Meteo.com</p>
   </div>
   <div class="controls">
     <a class="btn back" href="../">&larr; Live Matter</a>
@@ -82,138 +84,266 @@ window.__framed=(function(){try{return window.self!==window.top;}catch(e){return
 <script>
 (function(){
 'use strict';
-/* Presence: a dark room with a lamp behind slow smoke that only you can disturb. With the camera on, the piece sees movement and
-   nothing else: each frame is shrunk to a tiny grid of brightness, compared with the one before, and thrown away.
-   Where something moved, smoke is released and pushed the way the movement went. No image is kept, shown or sent.
-   Without a camera, your pointer or finger stirs it, and a few slow drafts keep the room alive. */
-
+/* Presence: the air over one place on Earth, right now, as a room of smoke that you can step into.
+   Data: Open-Meteo (free, no key; CC BY 4.0), hourly model values for a dozen places, refreshed every 30 minutes:
+   wind speed and direction at 10, 80, 120 and 180 m above the ground, temperature at 2, 80, 120 and 180 m,
+   gusts, cloud cover, daylight and sunshine. Every few minutes the room moves to another place.
+   Physics kept, look abstracted, in true 3D:
+   - the room is the lowest 180 m of the atmosphere (the boundary layer), filled with smoke from slow sources
+     on the ground; we ride along with the air, so what we see is the wind's shear: layers sliding past one
+     another and turning with height, as the real profile does at that place right now;
+   - the temperature profile sets the air's stability: in stable air (night, inversions) rising smoke stops at
+     its own level and spreads into flat sheets that ripple with buoyancy waves; in unstable air (sunny ground)
+     warm thermals break away from the floor and climb through the whole room;
+   - gusts set the turbulence; day or night and cloud cover set the light;
+   - with the camera on, the piece sees movement and nothing else (a tiny grid of brightness changes, thrown away
+     each frame): where you move, warm air is released into the room near you and rises through the smoke.
+     Without a camera, drag through the smoke. */
 var canvas=document.getElementById('c');
 var gl=canvas.getContext('webgl2',{antialias:false,alpha:false,depth:false,stencil:false,powerPreference:'high-performance'});
 if(!gl){window.__fail();return;}
-var statusEl=document.getElementById('status'),camBtn=document.getElementById('camBtn');
-var hasFloat=!!gl.getExtension('EXT_color_buffer_float')||!!gl.getExtension('EXT_color_buffer_half_float');
-if(!hasFloat){window.__fail('This piece needs a browser that can render to floating-point textures. Try a current desktop Chrome, Edge, Firefox or Safari.');return;}
+if(!gl.getExtension('EXT_color_buffer_float')){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+gl.getExtension('OES_texture_float_linear');
+var statusEl=document.getElementById('status'),readEl=document.getElementById('read'),placeEl=document.getElementById('place'),dotEl=document.getElementById('dot'),camBtn=document.getElementById('camBtn');
+var Q=new URLSearchParams(location.search);
+var low=Q.get('q')==='low'||Math.min(screen.width,screen.height)<700;
+var NX=low?64:96,NY=low?48:64,NZ=NX,TC=8,VX=NX/2,VY=NY/2,VZ=NZ/2;
+var L=4,H=L*NY/NX,HD=L/NX,HV=L/VX;
+var RS=low?.42:.55,RSMAX=low?.55:.85,ceilRS=1,fps=60,qt=0;
+function f(x){return x.toFixed(5);}
 
-var VS=['#version 300 es','precision highp float;','in vec2 aPos;uniform vec2 uTexel;',
-'out vec2 vUv,vL,vR,vT,vB;',
-'void main(){vUv=aPos*.5+.5;vL=vUv-vec2(uTexel.x,0.);vR=vUv+vec2(uTexel.x,0.);vT=vUv+vec2(0.,uTexel.y);vB=vUv-vec2(0.,uTexel.y);gl_Position=vec4(aPos,0.,1.);}'].join('\n');
-var HEAD='#version 300 es\nprecision highp float;precision highp sampler2D;\nin vec2 vUv,vL,vR,vT,vB;out vec4 o;\n';
-var FS={
-splat:HEAD+'uniform sampler2D uTarget;uniform float uAspect,uRadius;uniform vec3 uColor;uniform vec2 uPoint;\nvoid main(){vec2 p=vUv-uPoint;p.x*=uAspect;vec3 s=exp(-dot(p,p)/uRadius)*uColor;o=vec4(texture(uTarget,vUv).xyz+s,1.);}',
-motion:HEAD+'uniform sampler2D uTarget,uCur,uPrev;uniform vec2 uCamTexel,uCamScale;uniform float uK,uMode;uniform vec3 uColor;\n'+
- 'float D(vec2 c){return texture(uCur,c).r-texture(uPrev,c).r;}\n'+
- 'void main(){vec2 c=(vUv-.5)*uCamScale+.5;vec4 b=texture(uTarget,vUv);\n'+
- ' if(any(lessThan(c,vec2(0.)))||any(greaterThan(c,vec2(1.)))){o=b;return;}\n'+
- ' float m=texture(uCur,c).r;\n'+
- ' if(uMode<.5){vec2 e=uCamTexel*1.5;vec2 g=vec2(D(c+vec2(e.x,0.))-D(c-vec2(e.x,0.)),D(c+vec2(0.,e.y))-D(c-vec2(0.,e.y)));o=vec4(b.xy+g*uK+vec2(0.,m*uK*.04),0.,1.);}\n'+
- ' else{o=vec4(b.rgb+uColor*m*uK,1.);}}',
-advect:HEAD+'uniform sampler2D uVelocity,uSource;uniform vec2 uVelTexel;uniform float uDt,uDiss;\nvoid main(){vec2 c=vUv-uDt*texture(uVelocity,vUv).xy*uVelTexel;o=texture(uSource,c)/(1.+uDiss*uDt);}',
-divergence:HEAD+'uniform sampler2D uVelocity;\nvoid main(){float L=texture(uVelocity,vL).x,R=texture(uVelocity,vR).x,T=texture(uVelocity,vT).y,B=texture(uVelocity,vB).y;vec2 C=texture(uVelocity,vUv).xy;\n if(vL.x<0.)L=-C.x;if(vR.x>1.)R=-C.x;if(vT.y>1.)T=-C.y;if(vB.y<0.)B=-C.y;o=vec4(.5*(R-L+T-B),0.,0.,1.);}',
-curl:HEAD+'uniform sampler2D uVelocity;\nvoid main(){float L=texture(uVelocity,vL).y,R=texture(uVelocity,vR).y,T=texture(uVelocity,vT).x,B=texture(uVelocity,vB).x;o=vec4(.5*(R-L-T+B),0.,0.,1.);}',
-vorticity:HEAD+'uniform sampler2D uVelocity,uCurl;uniform float uCurlK,uDt,uBuoy;uniform sampler2D uDye;\nvoid main(){float L=texture(uCurl,vL).x,R=texture(uCurl,vR).x,T=texture(uCurl,vT).x,B=texture(uCurl,vB).x,C=texture(uCurl,vUv).x;\n vec2 f=.5*vec2(abs(T)-abs(B),abs(R)-abs(L));f/=length(f)+1e-4;f*=uCurlK*C;f.y*=-1.;\n vec2 v=texture(uVelocity,vUv).xy+f*uDt;float d=dot(texture(uDye,vUv).rgb,vec3(.33));v.y+=d*uBuoy*uDt;\n o=vec4(clamp(v,-1000.,1000.),0.,1.);}',
-pressure:HEAD+'uniform sampler2D uPressure,uDivergence;\nvoid main(){float L=texture(uPressure,vL).x,R=texture(uPressure,vR).x,T=texture(uPressure,vT).x,B=texture(uPressure,vB).x,d=texture(uDivergence,vUv).x;o=vec4((L+R+B+T-d)*.25,0.,0.,1.);}',
-gradient:HEAD+'uniform sampler2D uPressure,uVelocity;\nvoid main(){float L=texture(uPressure,vL).x,R=texture(uPressure,vR).x,T=texture(uPressure,vT).x,B=texture(uPressure,vB).x;vec2 v=texture(uVelocity,vUv).xy-vec2(R-L,T-B);o=vec4(v,0.,1.);}',
-scale:HEAD+'uniform sampler2D uTex;uniform float uV;\nvoid main(){o=uV*texture(uTex,vUv);}',
-display:HEAD+'uniform sampler2D uDye;uniform vec2 uDyeTexel,uLight;uniform float uT,uAsp;\n'+
+/* ---------- shaders ---------- */
+var VS='#version 300 es\nin vec2 aPos;void main(){gl_Position=vec4(aPos,0.,1.);}';
+var HEAD='#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;precision highp sampler3D;\nout vec4 o;\n';
+/* a 3D grid stored as a 2D atlas: one tile per horizontal slice; wraps sideways (the room repeats forever), clamps vertically */
+function grid(nm,nx,ny,nz){return [
+ 'ivec2 A'+nm+'(ivec3 v){return ivec2((v.y%'+TC+')*'+nx+'+v.x,(v.y/'+TC+')*'+nz+'+v.z);}',
+ 'ivec3 V'+nm+'(ivec2 q){int tx=q.x/'+nx+',ty=q.y/'+nz+';return ivec3(q.x-tx*'+nx+',ty*'+TC+'+tx,q.y-ty*'+nz+');}',
+ 'vec4 F'+nm+'(sampler2D s,ivec3 v){v.x=((v.x%'+nx+')+'+nx+')%'+nx+';v.z=((v.z%'+nz+')+'+nz+')%'+nz+';v.y=clamp(v.y,0,'+(ny-1)+');return texelFetch(s,A'+nm+'(v),0);}',
+ 'vec4 T'+nm+'(sampler2D s,vec3 p){p-=.5;vec3 fl=floor(p);ivec3 i=ivec3(fl);vec3 w=p-fl;',
+ ' vec4 a=mix(F'+nm+'(s,i),F'+nm+'(s,i+ivec3(1,0,0)),w.x),b=mix(F'+nm+'(s,i+ivec3(0,1,0)),F'+nm+'(s,i+ivec3(1,1,0)),w.x);',
+ ' vec4 c=mix(F'+nm+'(s,i+ivec3(0,0,1)),F'+nm+'(s,i+ivec3(1,0,1)),w.x),d=mix(F'+nm+'(s,i+ivec3(0,1,1)),F'+nm+'(s,i+ivec3(1,1,1)),w.x);',
+ ' return mix(mix(a,b,w.y),mix(c,d,w.y),w.z);}'].join('\n')+'\n';}
+var GD=grid('D',NX,NY,NZ),GV=grid('V',VX,VY,VZ);
+var CONST='const float L='+f(L)+',H='+f(H)+',HD='+f(HD)+',HV='+f(HV)+';\n';
+/* everything that adds air or smoke: sources on the ground, thermals, your hand; and what the camera saw */
+var SRC='uniform vec4 uS[16],uS2[16],uS3[16];uniform int uSN;\n'+
+ 'uniform sampler2D uMot,uMotP;uniform float uCamOn,uDI;uniform vec3 uEye;uniform mat3 uRot;uniform float uTanH,uAsp;\n'+
+ 'vec3 wrapd(vec3 r){r.xz-=L*floor(r.xz/L+.5);return r;}\n'+
+ /* project a point of the room into the visitor's camera view: movement seen there is released at a depth near you */
+ 'vec4 seen(vec3 X){if(uCamOn<.5)return vec4(0.);vec3 d=wrapd(X-uEye);vec3 v=transpose(uRot)*d;float z=-v.z;'+
+ ' float band=exp(-pow((z-uDI)/.55,2.));if(band<.02||z<.15)return vec4(0.);'+
+ ' vec2 s=vec2(v.x/(z*uTanH*uAsp),v.y/(z*uTanH));if(abs(s.x)>1.||abs(s.y)>1.)return vec4(0.);vec2 uv=s*.5+.5;'+
+ ' float m=texture(uMot,uv).r;vec2 e=1./vec2(textureSize(uMot,0))*1.5;'+
+ ' vec2 g=vec2(texture(uMot,uv+vec2(e.x,0.)).r-texture(uMotP,uv+vec2(e.x,0.)).r-texture(uMot,uv-vec2(e.x,0.)).r+texture(uMotP,uv-vec2(e.x,0.)).r,'+
+ '  texture(uMot,uv+vec2(0.,e.y)).r-texture(uMotP,uv+vec2(0.,e.y)).r-texture(uMot,uv-vec2(0.,e.y)).r+texture(uMotP,uv-vec2(0.,e.y)).r);'+
+ ' return vec4(m*band,g*band,0.);}\n';
+
+var FS={};
+FS.vadv=HEAD+CONST+GV+'uniform sampler2D uV;uniform float uDt;\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));vec3 u=FV(uV,v).xyz;o=vec4(TV(uV,vec3(v)+.5-uDt*u/HV).xyz*.998,0.);}';
+FS.curl=HEAD+CONST+GV+'uniform sampler2D uV;\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));ivec3 X=ivec3(1,0,0),Y=ivec3(0,1,0),Z=ivec3(0,0,1);'+
+ ' vec3 c=vec3(FV(uV,v+Y).z-FV(uV,v-Y).z-FV(uV,v+Z).y+FV(uV,v-Z).y,FV(uV,v+Z).x-FV(uV,v-Z).x-FV(uV,v+X).z+FV(uV,v-X).z,FV(uV,v+X).y-FV(uV,v-X).y-FV(uV,v+Y).x+FV(uV,v-Y).x)*.5/HV;'+
+ ' o=vec4(c,length(c));}';
+FS.vforce=HEAD+CONST+GV+GD+SRC+'uniform sampler2D uV,uC,uD;uniform float uDt,uT,uTurb,uConf,uRelax;uniform vec4 uProf[5];\n'+
+ 'vec2 prof(float y){float m=y/H*180.;vec2 r=uProf[4].yz;for(int i=0;i<4;i++){if(m<uProf[i+1].x){r=mix(uProf[i].yz,uProf[i+1].yz,clamp((m-uProf[i].x)/(uProf[i+1].x-uProf[i].x),0.,1.));break;}}return r;}\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));vec3 X=(vec3(v)+.5)*HV;vec3 u=FV(uV,v).xyz;'+
+ /* buoyancy from the smoke grid's warmth */
+ ' vec4 d=TD(uD,X/HD);u.y+=uDt*d.g;'+
+ /* the wind profile of the place, as seen riding with the air */
+ ' u.xz+=(prof(X.y)-u.xz)*min(uRelax*uDt,1.);'+
+ /* vortices kept alive (vorticity confinement) */
+ ' ivec3 IX=ivec3(1,0,0),IY=ivec3(0,1,0),IZ=ivec3(0,0,1);vec3 gw=vec3(FV(uC,v+IX).w-FV(uC,v-IX).w,FV(uC,v+IY).w-FV(uC,v-IY).w,FV(uC,v+IZ).w-FV(uC,v-IZ).w);'+
+ ' u+=uDt*uConf*HV*cross(gw/(length(gw)+1e-5),FV(uC,v).xyz);'+
+ /* gusts: a slowly changing turbulent push, stronger near the rough ground */
+ ' vec3 q=X*vec3(1.6,1.9,1.6);float tt=uT*.35;'+
+ ' vec3 tf=vec3(sin(q.y*2.1+tt*1.3+2.*sin(q.z*1.3-tt)),sin(q.z*1.9-tt+2.*sin(q.x*1.7+tt*.7)),sin(q.x*2.3+tt*1.1+2.*sin(q.y*1.1-tt*.8)));'+
+ ' u+=uDt*uTurb*tf*(.45+.8*exp(-X.y*1.4));'+
+ ' for(int k=0;k<16;k++){if(k>=uSN)break;vec3 r=wrapd(X-uS[k].xyz);float g=exp(-dot(r,r)/(uS[k].w*uS[k].w));u+=uDt*g*uS3[k].xyz;}'+
+ ' vec4 m=seen(X);u.y+=uDt*m.x*3.5;u+=uDt*(uRot*vec3(m.y,m.z,0.))*22.;u+=uDt*m.x*wrapd(X-uEye)*1.2;'+
+ ' if(v.y==0)u.y=max(u.y,0.);'+
+ ' float sp=length(u);if(sp>3.)u*=3./sp;'+
+ ' o=vec4(u,0.);}';
+FS.div=HEAD+CONST+GV+'uniform sampler2D uV;\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));ivec3 X=ivec3(1,0,0),Y=ivec3(0,1,0),Z=ivec3(0,0,1);'+
+ ' float B=v.y==0?-FV(uV,v).y:FV(uV,v-Y).y;'+
+ ' o=vec4(.5*(FV(uV,v+X).x-FV(uV,v-X).x+FV(uV,v+Y).y-B+FV(uV,v+Z).z-FV(uV,v-Z).z),0.,0.,0.);}';
+FS.jac=HEAD+CONST+GV+'uniform sampler2D uP,uDv;\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));ivec3 X=ivec3(1,0,0),Y=ivec3(0,1,0),Z=ivec3(0,0,1);float c=FV(uP,v).x;'+
+ ' float B=v.y==0?c:FV(uP,v-Y).x,T=v.y=='+(VY-1)+'?0.:FV(uP,v+Y).x;'+
+ ' o=vec4((FV(uP,v+X).x+FV(uP,v-X).x+FV(uP,v+Z).x+FV(uP,v-Z).x+B+T-FV(uDv,v).x)/6.,0.,0.,0.);}';
+FS.grad=HEAD+CONST+GV+'uniform sampler2D uP,uV;\n'+
+ 'void main(){ivec3 v=VV(ivec2(gl_FragCoord.xy));ivec3 X=ivec3(1,0,0),Y=ivec3(0,1,0),Z=ivec3(0,0,1);float c=FV(uP,v).x;'+
+ ' float B=v.y==0?c:FV(uP,v-Y).x,T=v.y=='+(VY-1)+'?0.:FV(uP,v+Y).x;'+
+ ' vec3 u=FV(uV,v).xyz-.5*vec3(FV(uP,v+X).x-FV(uP,v-X).x,T-B,FV(uP,v+Z).x-FV(uP,v-Z).x);if(v.y==0)u.y=max(u.y,0.);o=vec4(u,0.);}';
+/* the smoke: density (r), buoyancy (g), how much of it came from you (b) */
+FS.dens=HEAD+CONST+GD+GV+SRC+'uniform sampler2D uD,uV;uniform float uDt,uN2,uDecay,uInit,uT;\n'+
+ 'float hs(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453);}\n'+
+ 'void main(){ivec3 v=VD(ivec2(gl_FragCoord.xy));vec3 p=vec3(v)+.5;vec3 X=p*HD;'+
+ ' vec3 u=TV(uV,X/HV).xyz;vec4 d=TD(uD,p-uDt*u/HD);'+
+ ' d.r*=exp(-uDt*uDecay)*(1.-uDt*.6*smoothstep(H*.82,H,X.y));'+
+ ' d.g+=-uDt*uN2*u.y-uDt*d.g/7.;d.g=clamp(d.g,-2.,2.5);d.b*=exp(-uDt*.04);'+
+ ' for(int k=0;k<16;k++){if(k>=uSN)break;vec3 r=wrapd(X-uS[k].xyz);float g=exp(-dot(r,r)/(uS[k].w*uS[k].w));'+
+ '  float add=uDt*g*uS2[k].x;d.b=(d.b*d.r+add*uS2[k].z)/max(d.r+add,1e-4);d.r+=add;d.g+=uDt*g*uS2[k].y;}'+
+ ' vec4 m=seen(X);if(m.x>0.){float add=uDt*m.x*5.;d.b=(d.b*d.r+add)/max(d.r+add,1e-4);d.r+=add;d.g+=uDt*m.x*4.;}'+
+ ' if(uInit>0.){vec3 w=X*vec3(1.7,2.6,1.7);float n=.5+.25*sin(w.x+sin(w.z*1.3))+.25*sin(w.z*1.1+sin(w.y*2.+w.x));'+
+ '  float lay=exp(-pow((X.y-H*.35)/(H*.08),2.))+.6*exp(-pow((X.y-H*.62)/(H*.06),2.));d=vec4(.5*smoothstep(.45,.95,n)*lay,0.,0.,0.);}'+
+ ' o=max(d,vec4(0.,-2.,0.,0.));}';
+/* copy one slice of the atlas into a real 3D texture, so the renderer gets hardware filtering and wrapping */
+FS.copy=HEAD+CONST+GD+'uniform sampler2D uD;uniform int uLayer;\n'+
+ 'void main(){o=FD(uD,ivec3(int(gl_FragCoord.x),uLayer,int(gl_FragCoord.y)));}';
+/* light: how much of the key light reaches each point through the smoke above it (self-shadowing) */
+FS.light=HEAD+CONST+'uniform sampler3D uVol;uniform vec3 uLd;uniform int uLayer;uniform float uSig;\n'+
+ 'void main(){vec3 p=vec3(gl_FragCoord.x*HD,(float(uLayer)+.5)*'+f(H/NY)+',gl_FragCoord.y*HD);float s=0.,st=HD*1.3;'+
+ ' for(int i=0;i<40;i++){p+=uLd*st;if(p.y>H)break;s+=texture(uVol,vec3(p.x/L,p.z/L,p.y/H)).r*st;st*=1.07;}'+
+ ' o=vec4(exp(-s*uSig*.85),0.,0.,1.);}';
+FS.render=HEAD+CONST+'uniform sampler3D uVol,uLit,uNz;uniform vec3 uEye,uLd,uLc,uAmb,uFog;uniform mat3 uRot;uniform float uTanH,uAsp,uT,uSig,uHaze;uniform vec2 uRes;\n'+
  'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n'+
- 'float D(vec2 u){return dot(texture(uDye,u).rgb,vec3(.33));}\n'+
- /* Light passing through smoke (the Tyndall effect): a lamp sits behind the room. Each pixel looks back toward it
-    through the smoke: thick smoke between pixel and lamp casts shadow, gaps let beams through the air. */
- 'void main(){\n'+
- ' vec3 c=texture(uDye,vUv).rgb;float d=dot(c,vec3(.33));\n'+
- ' vec2 toL=uLight-vUv;float dist=length(toL*vec2(uAsp,1.));\n'+
- ' float j=hash(gl_FragCoord.xy+fract(uT)*13.);\n'+
- ' float occ=0.,beam=0.,w=1.;\n'+
- ' for(int i=0;i<28;i++){\n'+
- '  float f=(float(i)+j)/28.;vec2 s=vUv+toL*f;float ds=D(s);\n'+
- '  occ+=ds*(1./28.);\n'+
- '  beam+=(1.-smoothstep(.02,.35,ds))*w;w*=.94;\n'+
- ' }\n'+
- ' float T=exp(-occ*4.2);\n'+
- ' vec3 lamp=vec3(1.,.93,.84);\n'+
- ' float fall=1./(1.+dist*dist*1.6);\n'+
- ' float l=D(vUv-vec2(uDyeTexel.x*3.,0.)),r=D(vUv+vec2(uDyeTexel.x*3.,0.)),b=D(vUv-vec2(0.,uDyeTexel.y*3.)),t=D(vUv+vec2(0.,uDyeTexel.y*3.));\n'+
- ' vec3 n=normalize(vec3(l-r,b-t,.25));vec3 Ld=normalize(vec3(toL*vec2(uAsp,1.),.35));float dif=clamp(dot(n,Ld),0.,1.);\n'+
- ' float rim=pow(1.-n.z,1.5)*smoothstep(.0,.3,d);\n'+
- ' vec3 sm=c*(.22+1.25*T*fall*(.55+.6*dif))+lamp*rim*T*fall*.5;\n'+
- ' vec3 rays=lamp*beam/16.*fall*.45*(1.-smoothstep(.0,.6,d));\n'+
- ' vec3 bg=vec3(.010,.010,.014)+lamp*.10*exp(-dist*dist*5.);\n'+
- ' vec3 col=bg+rays+(1.-exp(-sm*1.25))*.95;\n'+
- ' vec2 vv=vUv-.5;col*=1.-.35*dot(vv,vv);col+=(hash(gl_FragCoord.xy+fract(uT)*71.)-.5)*.018;o=vec4(col,1.);}'
-};
+ 'void main(){vec2 uv=gl_FragCoord.xy/uRes*2.-1.;vec3 rd=normalize(uRot*vec3(uv.x*uTanH*uAsp,uv.y*uTanH,-1.));'+
+ ' float cosA=dot(rd,uLd);float g=.7,hg=(1.-g*g)/pow(1.+g*g-2.*g*cosA,1.5);float ph=.18+hg*.22;'+
+ ' float tF=rd.y<-1e-4?-uEye.y/rd.y:1e9,tTop=rd.y>1e-4?(H-uEye.y)/rd.y:1e9,tMax=12.;float tE=min(min(tF,tTop),tMax);'+
+ ' float t=.03*hash(gl_FragCoord.xy+fract(uT*7.13)*91.7)+.01;vec3 col=vec3(0.);float Tr=1.;'+
+ ' for(int i=0;i<140;i++){if(t>tE||Tr<.008)break;float dt=min(.022+t*.028,tE-t+1e-3);vec3 p=uEye+rd*(t+dt*.5);'+
+ '  vec3 tc=vec3(p.x/L,p.z/L,p.y/H);vec4 s=texture(uVol,tc);float lit=texture(uLit,tc).r;'+
+ '  vec3 nq=p*vec3(.9,1.3,.9)+vec3(uT*.011,-uT*.017,uT*.007);float dn=texture(uNz,nq).r*.55+texture(uNz,nq*2.9+.37).r*.30+texture(uNz,nq*7.3+.71).r*.15;'+
+ '  vec2 pq=p.xz*.071;float pch=texture(uNz,vec3(pq,.13)).r*.6+texture(uNz,vec3(pq*2.37+.5,.61)).r*.4;'+
+ '  float sd=max(s.r-.025,0.)*smoothstep(.2,.6,dn+s.r*1.5)*2.*smoothstep(.22,.62,pch)*smoothstep(H*.98,H*.55,p.y);'+
+ '  vec2 dh=abs(p.xz-uEye.xz);float home=smoothstep(L*.5,L*.36,max(dh.x,dh.y));float mine=clamp(s.b,0.,1.)*(1.-home);sd*=1.-mine;s.b*=home;'+
+ '  float de=sd*uSig+uHaze;vec3 alb=mix(vec3(.88,.88,.93),vec3(1.,.62,.46),clamp(s.b,0.,1.));'+
+ '  vec3 Li=uLc*lit*ph+uAmb*(.55+.45*clamp(p.y/H,0.,1.));float fg=exp(-max(t-2.5,0.)*.28);float a=1.-exp(-de*dt);col+=Tr*a*mix(uFog*2.,alb*Li+vec3(1.,.45,.3)*.22*clamp(s.b,0.,1.)*sd*4.,fg);Tr*=1.-a;t+=dt;}'+
+ ' vec3 bg;'+
+ ' if(tE==tF){vec3 P=uEye+rd*tF;float lit=texture(uLit,vec3(P.x/L,P.z/L,.5/'+NY+'.)).r;'+      /* the ground: matte, lit through the smoke */
+ '  bg=vec3(.010,.010,.013)+uLc*lit*max(uLd.y,0.)*.035+uAmb*.2;bg=mix(uFog,bg,exp(-tF*.09));}'+
+ ' else bg=uFog*(1.-.5*smoothstep(0.,.6,rd.y));'+
+ ' bg+=uLc*(pow(max(cosA,0.),300.)*1.5+pow(max(cosA,0.),12.)*.10)*smoothstep(-.03,.15,rd.y);'+
+ ' o=vec4(col+Tr*bg,1.);}';
+FS.acc=HEAD+'uniform sampler2D uCur,uPrev;uniform float uK;uniform vec2 uRes;\n'+
+ 'void main(){vec2 uv=gl_FragCoord.xy/uRes;vec3 c=texture(uCur,uv).rgb;vec3 p=texture(uPrev,uv).rgb;o=vec4(mix(p,c,uK),1.);}';
+FS.disp=HEAD+'uniform sampler2D uAcc;uniform vec2 uRes;uniform float uT;\n'+
+ 'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}\n'+
+ 'void main(){vec2 uv=gl_FragCoord.xy/uRes;vec3 c=texture(uAcc,uv).rgb;'+
+ ' vec3 b=textureLod(uAcc,uv,2.5).rgb;c+=max(b-.35,0.)*.25;'+
+ ' c*=1.1;c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.);c=pow(c,vec3(1./2.2));'+
+ ' vec2 v=uv-.5;c*=1.-.45*dot(v,v)*2.;c+=(hash(gl_FragCoord.xy+fract(uT)*71.)-.5)*.012;o=vec4(c,1.);}';
 
 function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s),src);throw new Error('shader');}return s;}
-var vsObj;
-function prog(fs){
-  var p=gl.createProgram();gl.attachShader(p,vsObj);gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
-  gl.bindAttribLocation(p,0,'aPos');gl.linkProgram(p);
-  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
+var vsObj,P={};
+function prog(fs){var p=gl.createProgram();gl.attachShader(p,vsObj);gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+  gl.bindAttribLocation(p,0,'aPos');gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
   var u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
-  for(var i=0;i<n;i++){var info=gl.getActiveUniform(p,i);u[info.name]=gl.getUniformLocation(p,info.name);}
-  return {p:p,u:u};
-}
-var P={};
-try{vsObj=sh(gl.VERTEX_SHADER,VS);for(var k in FS)P[k]=prog(FS[k]);}catch(e){window.__fail();return;}
-
-var vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  for(var i=0;i<n;i++){var info=gl.getActiveUniform(p,i);u[info.name.replace('[0]','')]=gl.getUniformLocation(p,info.name);}
+  return {p:p,u:u};}
+try{vsObj=sh(gl.VERTEX_SHADER,VS);for(var k in FS)P[k]=prog(FS[k]);}catch(e){console.error(e);window.__fail();return;}
+var vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 
-function target(w,h){
-  var tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+/* ---------- targets ---------- */
+function tex2(w,h,fmt,lin,mip){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  var F={rgba32:[gl.RGBA32F,gl.RGBA,gl.FLOAT],rgba16:[gl.RGBA16F,gl.RGBA,gl.HALF_FLOAT],r32:[gl.R32F,gl.RED,gl.FLOAT]}[fmt];
+  gl.texImage2D(gl.TEXTURE_2D,0,F[0],w,h,0,F[1],F[2],null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mip?gl.LINEAR_MIPMAP_LINEAR:lin?gl.LINEAR:gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,lin?gl.LINEAR:gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  var fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
+  var fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('fbo');
-  gl.viewport(0,0,w,h);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
-  return {tex:tex,fb:fb,w:w,h:h,tx:1/w,ty:1/h};
-}
-function dbl(w,h){var a=target(w,h),b=target(w,h);return {r:a,w:b,swap:function(){var t=this.r;this.r=this.w;this.w=t;}};}
-function del(t){if(!t)return;gl.deleteTexture(t.tex);gl.deleteFramebuffer(t.fb);}
-
-var W=1,H=1,vel,dye,div,crl,prs,simW,simH,dyeW,dyeH;
-var small=Math.min(screen.width,screen.height)<700;
-function resize(){
-  var dpr=Math.min(window.devicePixelRatio||1,2);
+  gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);return {t:t,fb:fb,w:w,h:h};}
+function pair(w,h,fmt){var a=tex2(w,h,fmt),b=tex2(w,h,fmt);return {r:a,w:b,swap:function(){var x=this.r;this.r=this.w;this.w=x;}};}
+function tex3(fmt){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_3D,t);
+  if(fmt==='rgba')gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA16F,NX,NZ,NY,0,gl.RGBA,gl.HALF_FLOAT,null);else gl.texImage3D(gl.TEXTURE_3D,0,gl.R16F,NX,NZ,NY,0,gl.RED,gl.HALF_FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.REPEAT);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+  return {t:t,fb:gl.createFramebuffer()};}
+var AVW=TC*VX,AVH=(VY/TC)*VZ,ADW=TC*NX,ADH=(NY/TC)*NZ,vel,curlT,divT,prs,dens,vol,lit;
+try{vel=pair(AVW,AVH,'rgba32');curlT=tex2(AVW,AVH,'rgba32');divT=tex2(AVW,AVH,'r32');prs=pair(AVW,AVH,'r32');dens=pair(ADW,ADH,'rgba16');vol=tex3('rgba');lit=tex3('r');}
+catch(e){console.error(e);window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+/* a small tileable noise volume: fine detail the simulation grid is too coarse to carry (the curl of real smoke) */
+var noiseT=gl.createTexture();(function(){var n=32,b=new Uint8Array(n*n*n);for(var i=0;i<b.length;i++)b[i]=Math.floor(Math.random()*256);
+  gl.bindTexture(gl.TEXTURE_3D,noiseT);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage3D(gl.TEXTURE_3D,0,gl.R8,n,n,n,0,gl.RED,gl.UNSIGNED_BYTE,b);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T,gl.TEXTURE_WRAP_R].forEach(function(w){gl.texParameteri(gl.TEXTURE_3D,w,gl.REPEAT);});})();
+var CW=1,CH=1,RW=1,RH=1,hdr=null,acc=null;
+function resize(){var dpr=Math.min(window.devicePixelRatio||1,1.5);
   var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
-  if(w===W&&h===H&&vel)return;
-  W=w;H=h;canvas.width=w;canvas.height=h;
-  var a=w/h,sr=small?96:144,dr=small?512:900;
-  simH=a>=1?sr:Math.round(sr/a);simW=Math.round(simH*a);
-  dyeH=a>=1?dr:Math.round(dr/a);dyeW=Math.round(dyeH*a);
-  try{
-    if(vel){del(vel.r);del(vel.w);del(dye.r);del(dye.w);del(div);del(crl);del(prs.r);del(prs.w);}
-    vel=dbl(simW,simH);dye=dbl(dyeW,dyeH);div=target(simW,simH);crl=target(simW,simH);prs=dbl(simW,simH);
-  }catch(e){window.__fail('This piece needs a browser that can render to floating-point textures. Try a current desktop Chrome, Edge, Firefox or Safari.');throw e;}
-}
+  if(w===CW&&h===CH&&hdr)return;CW=w;CH=h;canvas.width=w;canvas.height=h;setTarget();}
+function del(x){if(x){gl.deleteTexture(x.t);gl.deleteFramebuffer(x.fb);}}
+function setTarget(){RW=Math.max(1,Math.round(CW*RS));RH=Math.max(1,Math.round(CH*RS));
+  del(hdr);if(acc){del(acc.r);del(acc.w);}
+  hdr=tex2(RW,RH,'rgba16',true);acc={r:tex2(RW,RH,'rgba16',true,true),w:tex2(RW,RH,'rgba16',true,true),swap:function(){var x=this.r;this.r=this.w;this.w=x;}};accN=0;}
+var accN=0;
 window.addEventListener('resize',resize);resize();
 
-function run(p,out,texel){
-  gl.useProgram(p.p);
-  if(p.u.uTexel)gl.uniform2f(p.u.uTexel,texel[0],texel[1]);
-  gl.bindFramebuffer(gl.FRAMEBUFFER,out?out.fb:null);
-  gl.viewport(0,0,out?out.w:W,out?out.h:H);
-  gl.drawArrays(gl.TRIANGLES,0,3);
-}
-function bind(p,name,tex,unit){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(p.u[name],unit);}
+function use(p){gl.useProgram(p.p);return p;}
+function to(t,w,h){gl.bindFramebuffer(gl.FRAMEBUFFER,t?t.fb:null);gl.viewport(0,0,w,h);}
+function bind(p,name,t,unit,three){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(three?gl.TEXTURE_3D:gl.TEXTURE_2D,t);gl.uniform1i(p.u[name],unit);}
+function draw(){gl.drawArrays(gl.TRIANGLES,0,3);}
+function layer(t3,i,w,h){gl.bindFramebuffer(gl.FRAMEBUFFER,t3.fb);gl.framebufferTextureLayer(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,t3.t,0,i);gl.viewport(0,0,w,h);}
 
-function splat(x,y,fx,fy,color,radius){
-  var p=P.splat;gl.useProgram(p.p);
-  gl.uniform1f(p.u.uAspect,W/H);gl.uniform2f(p.u.uPoint,x,y);
-  gl.uniform1f(p.u.uRadius,radius*.0008);gl.uniform3f(p.u.uColor,fx,fy,0);
-  bind(p,'uTarget',vel.r.tex,0);run(p,vel.w,[vel.r.tx,vel.r.ty]);vel.swap();
-  gl.useProgram(p.p);gl.uniform1f(p.u.uRadius,radius*.0011);gl.uniform3f(p.u.uColor,color[0],color[1],color[2]);
-  bind(p,'uTarget',dye.r.tex,0);run(p,dye.w,[dye.r.tx,dye.r.ty]);dye.swap();
+/* ---------- the places and their air ---------- */
+var PLACES=[['Reykjavík',64.15,-21.94],['Wellington',-41.29,174.78],['Chicago',41.88,-87.63],['Punta Arenas',-53.16,-70.91],
+  ['Phoenix',33.45,-112.07],['Ulaanbaatar',47.89,106.91],['Lisbon',38.72,-9.14],['Nairobi',-1.29,36.82],['Tokyo',35.68,139.69],
+  ['Longyearbyen',78.22,15.65],['Cape Town',-33.92,18.42],['Mumbai',19.08,72.88]];
+var VARS=['temperature_2m','temperature_80m','temperature_120m','temperature_180m','wind_speed_10m','wind_speed_80m','wind_speed_120m','wind_speed_180m',
+  'wind_direction_10m','wind_direction_80m','wind_direction_120m','wind_direction_180m','wind_gusts_10m','cloud_cover','is_day','shortwave_radiation'];
+var air=null,live=false,placeI=Math.floor(Math.random()*PLACES.length),placeT0=0,PLACE_DUR=Number(Q.get('place'))||150;
+function synth(i,tm){var s=i*1.7+tm/3600*.3,w=function(a){return Math.sin(s*a)*.5+.5;};var o={};
+  var day=w(1.3)>.4;o.temperature_2m=10+12*w(.7);var lap=(w(2.1)-.45)*.03;
+  o.temperature_80m=o.temperature_2m-0.0098*78+lap*78;o.temperature_120m=o.temperature_2m-0.0098*118+lap*118;o.temperature_180m=o.temperature_2m-0.0098*178+lap*178;
+  var sp=8+35*w(1.9),dir=360*w(.37);o.wind_speed_10m=sp*.55;o.wind_speed_80m=sp*.85;o.wind_speed_120m=sp*.95;o.wind_speed_180m=sp;
+  o.wind_direction_10m=dir-25;o.wind_direction_80m=dir-8;o.wind_direction_120m=dir;o.wind_direction_180m=dir+10+40*w(3.1);
+  o.wind_gusts_10m=o.wind_speed_10m*(1.3+.8*w(2.7));o.cloud_cover=100*w(1.1);o.is_day=day?1:0;o.shortwave_radiation=day?600*w(.9):0;return o;}
+function current(){var i=placeI%PLACES.length;
+  if(air&&air[i]){var h=air[i].hourly,now=new Date(),tf=now.getUTCHours()+now.getUTCMinutes()/60,a=Math.min(Math.floor(tf),h.time.length-2),fr=tf-a,o={};
+    VARS.forEach(function(v){var x=h[v][a],y=h[v][a+1];if(x==null)x=y;if(y==null)y=x;
+      if(v.indexOf('direction')>=0){var d=((y-x+540)%360)-180;o[v]=x+d*fr;}else if(v==='is_day')o[v]=fr<.5?x:y;else o[v]=x+(y-x)*fr;});
+    for(var k in o)if(o[k]==null||isNaN(o[k]))return synth(i,Date.now()/1000);return o;}
+  return synth(i,Date.now()/1000);}
+function fetchAir(){
+  if(window.__framed&&Q.get('live')!=='1'){statusEl.textContent='Simulated air (preview)';return;}
+  var url='https://api.open-meteo.com/v1/forecast?latitude='+PLACES.map(function(p){return p[1];}).join(',')+'&longitude='+PLACES.map(function(p){return p[2];}).join(',')+
+    '&hourly='+VARS.join(',')+'&forecast_days=2&timezone=GMT';
+  fetch(url).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(function(j){
+    air=Array.isArray(j)?j:[j];live=true;statusEl.textContent='Live from Open-Meteo';if(dotEl)dotEl.classList.add('live');
+  }).catch(function(){if(!live){statusEl.textContent='Open-Meteo unreachable · simulated air';}});
 }
+fetchAir();setInterval(fetchAir,30*60*1000);
+
+/* the state the room eases toward */
+var KMH=.022,FRAME=.85;
+var S={prof:[[0,0,0],[10,0,0],[80,0,0],[120,0,0],[180,0,0]],ground:[0,0],N2:.3,inst:.2,turb:.2,day:1,cloud:.3},Tgt=null,obs=null;
+function toVec(sp,dir){var a=dir*Math.PI/180;return [-sp*Math.sin(a)*KMH,sp*Math.cos(a)*KMH];}  /* x east, z south; the wind blows from dir */
+function target(o){var hs=[10,80,120,180],v=hs.map(function(h){return toVec(o['wind_speed_'+h+'m'],o['wind_direction_'+h+'m']);});
+  var mx=(v[0][0]+v[1][0]+v[2][0]+v[3][0])/4,mz=(v[0][1]+v[1][1]+v[2][1]+v[3][1])/4;
+  var prof=[[0,-FRAME*mx,-FRAME*mz]].concat(hs.map(function(h,i){return [h,v[i][0]-FRAME*mx,v[i][1]-FRAME*mz];}));
+  var th2=o.temperature_2m+273.15+.0098*2,th180=o.temperature_180m+273.15+.0098*180,Sg=(th180-th2)/178;     /* potential-temperature gradient, K/m */
+  var N2=Math.max(-.3,Math.min(1.3,Sg*45+.08));
+  var inst=Math.max(0,Math.min(1,-Sg*90))*.7+Math.min(1,(o.shortwave_radiation||0)/800)*.5;
+  var gf=Math.max(0,Math.min(2,(o.wind_gusts_10m-o.wind_speed_10m)/Math.max(o.wind_speed_10m,6)));
+  return {prof:prof,ground:[-FRAME*mx,-FRAME*mz],N2:N2,inst:Math.min(1,inst),turb:.12+.3*gf+.004*o.wind_speed_180m,day:Q.get('day')?Number(Q.get('day')):o.is_day?1:0,cloud:(o.cloud_cover||0)/100,Sg:Sg};}
+function compass(d){return ['N','NE','E','SE','S','SW','W','NW'][Math.round(((d%360)+360)%360/45)%8];}
+function caption(o,T_){placeEl.textContent='Air over '+PLACES[placeI%PLACES.length][0];
+  var kind=T_.Sg>.006?'stable layers':T_.Sg<-.002?'rising thermals':'mixed air';
+  readEl.textContent='10 m '+Math.round(o.wind_speed_10m)+' km/h '+compass(o.wind_direction_10m)+' · 180 m '+Math.round(o.wind_speed_180m)+' km/h '+compass(o.wind_direction_180m)+
+    ' · gusts '+Math.round(o.wind_gusts_10m)+' · '+kind+' · '+(o.is_day?'day':'night');}
+function lerp(a,b,k){return a+(b-a)*k;}
+function ease(dt){var k=1-Math.exp(-dt/6);
+  for(var i=0;i<5;i++){S.prof[i][0]=Tgt.prof[i][0];S.prof[i][1]=lerp(S.prof[i][1],Tgt.prof[i][1],k);S.prof[i][2]=lerp(S.prof[i][2],Tgt.prof[i][2],k);}
+  S.ground[0]=lerp(S.ground[0],Tgt.ground[0],k);S.ground[1]=lerp(S.ground[1],Tgt.ground[1],k);
+  ['N2','inst','turb','day','cloud'].forEach(function(n){S[n]=lerp(S[n],Tgt[n],k*.6);});}
+
+/* ---------- sources on the ground ---------- */
+function rnd(){return Math.random();}
+function smoulder(age){return {x:rnd()*L,z:rnd()*L,ph:rnd()*6.28,fq:.15+.5*rnd(),str:.5+1.3*rnd()*rnd()+.2,r:.06+.08*rnd(),heat:.6+1.2*rnd(),life:35+60*rnd(),age:age||0};}
+var smoulders=[];for(var i=0;i<9;i++)smoulders.push(smoulder(rnd()*60));
+var thermals=[],hands=[];
 
 /* ---------- camera: movement only ---------- */
 var video=null,stream=null,camOn=false,cw=96,ch=72,cvs=null,cctx=null,prevL=null,curD=null,prevD=null,texCur=null,texPrev=null,lastVT=-1,presence=0;
 function camTex(){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,1,1,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array(1));return t;}
+texCur=camTex();texPrev=camTex();
 function upload(t,data){gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,cw,ch,0,gl.RED,gl.UNSIGNED_BYTE,data);}
 function startCam(){
   navigator.mediaDevices.getUserMedia({video:{width:{ideal:320},height:{ideal:240},facingMode:'user'},audio:false}).then(function(s){
@@ -223,118 +353,126 @@ function startCam(){
       var vw=video.videoWidth||320,vh=video.videoHeight||240;cw=96;ch=Math.max(8,Math.round(96*vh/vw));
       cvs=document.createElement('canvas');cvs.width=cw;cvs.height=ch;cctx=cvs.getContext('2d',{willReadFrequently:true});
       prevL=new Float32Array(cw*ch);curD=new Uint8Array(cw*ch);prevD=new Uint8Array(cw*ch);
-      if(!texCur){texCur=camTex();texPrev=camTex();}
       upload(texCur,curD);upload(texPrev,prevD);
-      camOn=true;camBtn.textContent='Camera on';statusEl.textContent='Camera sees movement only · nothing is recorded';
+      camOn=true;camBtn.textContent='Camera on';
     });
-  }).catch(function(){statusEl.textContent='Camera was blocked. Allow it in the browser settings and tap again';});
+  }).catch(function(){camBtn.textContent='Camera blocked';});
 }
-function stopCam(){
-  if(stream)stream.getTracks().forEach(function(t){t.stop();});
-  stream=null;video=null;camOn=false;camBtn.textContent='Use camera';statusEl.textContent='Move your pointer or finger through the smoke';
-}
-if(!window.__framed&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
-  camBtn.hidden=false;
-  camBtn.addEventListener('click',function(){if(camOn)stopCam();else startCam();});
-}
+function stopCam(){if(stream)stream.getTracks().forEach(function(t){t.stop();});stream=null;video=null;camOn=false;camBtn.textContent='Use camera';}
+if(camBtn&&!window.__framed&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){
+  camBtn.hidden=false;camBtn.addEventListener('click',function(){if(camOn)stopCam();else startCam();});}
 function readCam(){
-  if(!camOn||!video||video.readyState<2||video.currentTime===lastVT)return false;
+  if(!camOn||!video||video.readyState<2||video.currentTime===lastVT)return;
   lastVT=video.currentTime;
   cctx.setTransform(-1,0,0,1,cw,0);cctx.drawImage(video,0,0,cw,ch);
-  var px=cctx.getImageData(0,0,cw,ch).data,tmp=prevD;prevD=curD;curD=tmp;
-  var sum=0;
-  for(var y=0;y<ch;y++){
-    var row=(ch-1-y)*cw;
-    for(var x=0;x<cw;x++){
-      var i=y*cw+x,j=i*4,l=px[j]*.299+px[j+1]*.587+px[j+2]*.114;
-      var d=Math.abs(l-prevL[i]);prevL[i]=l;
-      var v=Math.max(0,d-10)*4;if(v>255)v=255;
-      curD[row+x]=v;sum+=v;
-    }
-  }
+  var px=cctx.getImageData(0,0,cw,ch).data,tmp=prevD;prevD=curD;curD=tmp;var sum=0;
+  for(var y=0;y<ch;y++){var row=(ch-1-y)*cw;
+    for(var x=0;x<cw;x++){var i=y*cw+x,j=i*4,l=px[j]*.299+px[j+1]*.587+px[j+2]*.114;
+      var d=Math.abs(l-prevL[i]);prevL[i]=l;var v=Math.max(0,d-10)*4;if(v>255)v=255;curD[row+x]=v;sum+=v;}}
   presence+=(Math.min(1,sum/(cw*ch*20))-presence)*.1;
-  upload(texPrev,prevD);upload(texCur,curD);
-  return true;
-}
+  upload(texPrev,prevD);upload(texCur,curD);}
 
-/* ---------- pointer ---------- */
-var ptr={x:.5,y:.5,dx:0,dy:0,moved:false,down:false};
-function pos(ev){var r=canvas.getBoundingClientRect();return [(ev.clientX-r.left)/r.width,1-(ev.clientY-r.top)/r.height];}
-canvas.addEventListener('pointerdown',function(ev){ptr.down=true;var p=pos(ev);ptr.x=p[0];ptr.y=p[1];});
-canvas.addEventListener('pointermove',function(ev){
-  if(ev.pointerType!=='mouse'&&!ptr.down)return;
-  var p=pos(ev);ptr.dx+=p[0]-ptr.x;ptr.dy+=p[1]-ptr.y;ptr.x=p[0];ptr.y=p[1];ptr.moved=true;
-});
-function up(){ptr.down=false;}
-canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-
-/* ---------- colour of the smoke: pale, drifting slowly between warm, lilac and sea ---------- */
-var TINTS=[[1,.92,.84],[.86,.82,1],[.78,.95,.95],[1,.86,.9]];
-function tint(t,o){var u=(t*.02+o)%TINTS.length,i=Math.floor(u),f=u-i,a=TINTS[i],b=TINTS[(i+1)%TINTS.length];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f];}
+/* ---------- the visitor's own viewpoint, drifting slowly through the room ---------- */
+var TANH=Math.tan(55*Math.PI/360),cam={eye:[0,0,0],rot:[1,0,0,0,1,0,0,0,1]};
+function camera(t){var a=t*.011,b=t*.017;
+  var eye=[L*.5+1.3*Math.cos(a),H*.40+H*.10*Math.sin(b),L*.5+1.3*Math.sin(a)];
+  var yaw=a+Math.PI*.5+.5*Math.sin(t*.029),pitch=.04+.12*Math.sin(t*.021+1.);
+  var fw=[Math.cos(pitch)*Math.cos(yaw),Math.sin(pitch),Math.cos(pitch)*Math.sin(yaw)];
+  var rt=norm(cross(fw,[0,1,0])),up=cross(rt,fw);
+  cam.eye=eye;cam.rot=[rt[0],rt[1],rt[2],up[0],up[1],up[2],-fw[0],-fw[1],-fw[2]];}
+function rayDir(sx,sy){var M=cam.rot,q=[sx*TANH*CW/CH,sy*TANH,-1];
+  return norm([M[0]*q[0]+M[3]*q[1]+M[6]*q[2],M[1]*q[0]+M[4]*q[1]+M[7]*q[2],M[2]*q[0]+M[5]*q[1]+M[8]*q[2]]);}
+/* pointer: drag to stir warm air into the room where you drag */
+var ptr={x:0,y:0,down:false,last:0};
+function ppos(ev){var r=canvas.getBoundingClientRect();return [((ev.clientX-r.left)/r.width)*2-1,1-((ev.clientY-r.top)/r.height)*2];}
+canvas.addEventListener('pointerdown',function(ev){ptr.down=true;var p=ppos(ev);ptr.x=p[0];ptr.y=p[1];});
+canvas.addEventListener('pointermove',function(ev){if(ev.pointerType!=='mouse'&&!ptr.down)return;var p=ppos(ev);var dx=p[0]-ptr.x,dy=p[1]-ptr.y;ptr.x=p[0];ptr.y=p[1];
+  var sp=Math.hypot(dx,dy);if(sp<.002)return;var d=rayDir(p[0],p[1]),D=1.4;var M=cam.rot,k=Math.min(6,sp*90);
+  var v=[M[0]*dx+M[3]*dy,M[1]*dx+M[4]*dy,M[2]*dx+M[5]*dy];var n=Math.hypot(v[0],v[1],v[2])||1;
+  hands.push({x:cam.eye[0]+d[0]*D,y:Math.max(.08,cam.eye[1]+d[1]*D),z:cam.eye[2]+d[2]*D,v:[v[0]/n*k,v[1]/n*k+.6,v[2]/n*k],life:.35});if(hands.length>3)hands.shift();});
+function pup(){ptr.down=false;}canvas.addEventListener('pointerup',pup);canvas.addEventListener('pointercancel',pup);
 
 /* ---------- loop ---------- */
+var US=new Float32Array(64),US2=new Float32Array(64),US3=new Float32Array(64),PR=new Float32Array(20);
+var clock=Math.random()*600,simT=0,last=performance.now(),first=true,fpsA=60,lastCap=-99;
 var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-var clock=Math.random()*300,last=performance.now();
-gl.disable(gl.BLEND);
+function sources(dt){var n=0;
+  function add(x,y,z,r,smoke,heat,warm,vx,vy,vz){if(n>=16)return;US.set([x,y,z,r],n*4);US2.set([smoke,heat,warm,0],n*4);US3.set([vx,vy,vz,0],n*4);n++;}
+  smoulders.forEach(function(s,i){s.age+=dt;if(s.age>s.life)smoulders[i]=s=smoulder(0);
+    s.x=((s.x+S.ground[0]*dt)%L+L)%L;s.z=((s.z+S.ground[1]*dt)%L+L)%L;   /* the ground slides beneath the drifting air */
+    var env=Math.min(1,s.age/6)*Math.min(1,(s.life-s.age)/8),pulse=.55+.45*Math.sin(simT*s.fq+s.ph)*Math.sin(simT*s.fq*.37+s.ph*2.);
+    add(s.x,.10,s.z,s.r,1.9*s.str*pulse*env,(1.6+1.4*s.heat+1.6*S.inst)*env,0,0,.5+.6*s.heat,0);});
+  if(rnd()<dt*(.12+.9*S.inst)&&thermals.length<4)thermals.push({x:rnd()*L,z:rnd()*L,life:2.5+3*rnd(),age:0});
+  thermals=thermals.filter(function(t){t.age+=dt;t.x+=S.ground[0]*dt;t.z+=S.ground[1]*dt;return t.age<t.life;});
+  thermals.forEach(function(t){var e=Math.sin(Math.PI*t.age/t.life);add(t.x,.07,t.z,.2,.55*e,(2.4+1.6*S.inst)*e,0,0,.4*e,0);});
+  hands=hands.filter(function(h){h.life-=dt;return h.life>0;});
+  hands.forEach(function(h){add(h.x,h.y,h.z,.13,4.,2.5,1,h.v[0],h.v[1],h.v[2]);});
+  return n;}
+function setSrc(p,sn){gl.uniform4fv(p.u.uS,US);gl.uniform4fv(p.u.uS2,US2);gl.uniform4fv(p.u.uS3,US3);gl.uniform1i(p.u.uSN,sn);
+  gl.uniform3f(p.u.uEye,cam.eye[0],cam.eye[1],cam.eye[2]);gl.uniformMatrix3fv(p.u.uRot,false,cam.rot);gl.uniform1f(p.u.uTanH,TANH);gl.uniform1f(p.u.uAsp,CW/CH);
+  gl.uniform1f(p.u.uCamOn,camOn?1:0);gl.uniform1f(p.u.uDI,1.5-.6*Math.min(1,presence*2.5));
+  bind(p,'uMot',texCur,6);bind(p,'uMotP',texPrev,7);}
 function frame(now){
-  requestAnimationFrame(frame);
-  resize();
-  var dt=Math.min(.033,(now-last)/1000);last=now;clock+=dt;
-  if(calm)dt*=.5;
-  var sx=[vel.r.tx,vel.r.ty];
-
-  /* ambient drafts: a few slow sources so the room is never still; they give way when someone is present */
-  var amb=(1-Math.min(1,presence*3))*(ptr.moved?.4:1);
-  for(var e=0;e<3;e++){
-    var tt=clock*(.07+e*.023)+e*2.1;
-    var ex=.5+.38*Math.sin(tt*1.3+e),ey=.12+.1*Math.sin(tt*.9+e*1.7)+e*.05;
-    if(Math.random()<.5*amb){
-      var c=tint(clock,e*1.3),g=.010*amb;
-      splat(ex,ey,Math.sin(tt*2.)*60*amb,(120+60*Math.sin(tt))*amb,[c[0]*g*5,c[1]*g*5,c[2]*g*5],.9);
-    }
-  }
-  /* pointer */
-  if(ptr.moved){
-    var pc=tint(clock,.5);
-    splat(ptr.x,ptr.y,ptr.dx*7000,ptr.dy*7000,[pc[0]*.22,pc[1]*.22,pc[2]*.22],1.2);
-    ptr.dx=0;ptr.dy=0;ptr.moved=false;
-  }
-  /* camera movement */
-  var fresh=readCam();
-  if(camOn&&texCur){
-    var va=cw/ch,sa=W/H,scale=va>sa?[sa/va,1]:[1,va/sa];
-    var p=P.motion;gl.useProgram(p.p);
-    gl.uniform2f(p.u.uCamTexel,1/cw,1/ch);gl.uniform2f(p.u.uCamScale,scale[0],scale[1]);
-    bind(p,'uCur',texCur,1);bind(p,'uPrev',texPrev,2);
-    if(fresh){
-      gl.uniform1f(p.u.uMode,0);gl.uniform1f(p.u.uK,1400);bind(p,'uTarget',vel.r.tex,0);run(p,vel.w,sx);vel.swap();
-    }
-    gl.useProgram(p.p);
-    var mc=tint(clock,0);gl.uniform1f(p.u.uMode,1);gl.uniform1f(p.u.uK,dt*1.1);gl.uniform3f(p.u.uColor,mc[0],mc[1],mc[2]);
-    bind(p,'uTarget',dye.r.tex,0);run(p,dye.w,[dye.r.tx,dye.r.ty]);dye.swap();
-  }
-
-  /* fluid step */
-  var q;
-  q=P.curl;gl.useProgram(q.p);bind(q,'uVelocity',vel.r.tex,0);run(q,crl,sx);
-  q=P.vorticity;gl.useProgram(q.p);bind(q,'uVelocity',vel.r.tex,0);bind(q,'uCurl',crl.tex,1);bind(q,'uDye',dye.r.tex,2);
-  gl.uniform1f(q.u.uCurlK,22);gl.uniform1f(q.u.uDt,dt);gl.uniform1f(q.u.uBuoy,40);run(q,vel.w,sx);vel.swap();
-  q=P.divergence;gl.useProgram(q.p);bind(q,'uVelocity',vel.r.tex,0);run(q,div,sx);
-  q=P.scale;gl.useProgram(q.p);bind(q,'uTex',prs.r.tex,0);gl.uniform1f(q.u.uV,.8);run(q,prs.w,sx);prs.swap();
-  q=P.pressure;gl.useProgram(q.p);
-  for(var it=0;it<20;it++){bind(q,'uPressure',prs.r.tex,0);bind(q,'uDivergence',div.tex,1);run(q,prs.w,sx);prs.swap();}
-  q=P.gradient;gl.useProgram(q.p);bind(q,'uPressure',prs.r.tex,0);bind(q,'uVelocity',vel.r.tex,1);run(q,vel.w,sx);vel.swap();
-  q=P.advect;gl.useProgram(q.p);gl.uniform2f(q.u.uVelTexel,sx[0],sx[1]);gl.uniform1f(q.u.uDt,dt);
-  gl.uniform1f(q.u.uDiss,.25);bind(q,'uVelocity',vel.r.tex,0);bind(q,'uSource',vel.r.tex,1);run(q,vel.w,sx);vel.swap();
-  gl.useProgram(q.p);gl.uniform1f(q.u.uDiss,.55);bind(q,'uVelocity',vel.r.tex,0);bind(q,'uSource',dye.r.tex,1);run(q,dye.w,[dye.r.tx,dye.r.ty]);dye.swap();
-
-  q=P.display;gl.useProgram(q.p);bind(q,'uDye',dye.r.tex,0);gl.uniform2f(q.u.uDyeTexel,dye.r.tx,dye.r.ty);gl.uniform1f(q.u.uT,clock);
-  gl.uniform2f(q.u.uLight,.5+.22*Math.sin(clock*.031),.80+.08*Math.sin(clock*.023));gl.uniform1f(q.u.uAsp,W/H);
-  run(q,null,[1/W,1/H]);
+  requestAnimationFrame(frame);resize();
+  var rdt=Math.min(.05,(now-last)/1000);last=now;fpsA+=(1/Math.max(rdt,1e-3)-fpsA)*.05;
+  var dt=Math.min(.033,rdt)*(calm?.5:1);clock+=dt;simT+=dt;
+  /* adaptive render scale, with hysteresis; only the internal target changes, never the canvas */
+  qt+=rdt;if(qt>3&&fpsA<40&&RS>.32){RS=Math.max(.32,RS-.05);ceilRS=RS;qt=0;setTarget();}
+  else if(qt>10&&fpsA>57&&RS<Math.min(RSMAX,ceilRS+.1)-.001){RS=Math.min(RSMAX,RS+.05);qt=0;setTarget();}
+  /* which place */
+  if(simT-placeT0>PLACE_DUR||!Tgt){if(Tgt){placeI=(placeI+1)%PLACES.length;}placeT0=simT;}
+  if(simT-lastCap>5){obs=current();Tgt=target(obs);caption(obs,Tgt);lastCap=simT;}
+  ease(dt);readCam();camera(clock);
+  var sn=sources(dt);
+  for(var i=0;i<5;i++)PR.set([S.prof[i][0],S.prof[i][1],S.prof[i][2],0],i*4);
+  gl.disable(gl.BLEND);
+  /* velocity */
+  var p=use(P.vadv);bind(p,'uV',vel.r.t,0);gl.uniform1f(p.u.uDt,dt);to(vel.w,AVW,AVH);draw();vel.swap();
+  p=use(P.curl);bind(p,'uV',vel.r.t,0);to(curlT,AVW,AVH);draw();
+  p=use(P.vforce);bind(p,'uV',vel.r.t,0);bind(p,'uC',curlT.t,1);bind(p,'uD',dens.r.t,2);setSrc(p,sn);
+  gl.uniform1f(p.u.uDt,dt);gl.uniform1f(p.u.uT,simT);gl.uniform1f(p.u.uTurb,S.turb);gl.uniform1f(p.u.uConf,1.1);gl.uniform1f(p.u.uRelax,.35);gl.uniform4fv(p.u.uProf,PR);
+  to(vel.w,AVW,AVH);draw();vel.swap();
+  p=use(P.div);bind(p,'uV',vel.r.t,0);to(divT,AVW,AVH);draw();
+  p=use(P.jac);bind(p,'uDv',divT.t,1);for(var j=0;j<20;j++){bind(p,'uP',prs.r.t,0);to(prs.w,AVW,AVH);draw();prs.swap();}
+  p=use(P.grad);bind(p,'uP',prs.r.t,0);bind(p,'uV',vel.r.t,1);to(vel.w,AVW,AVH);draw();vel.swap();
+  /* smoke */
+  p=use(P.dens);bind(p,'uD',dens.r.t,0);bind(p,'uV',vel.r.t,1);setSrc(p,sn);
+  gl.uniform1f(p.u.uDt,dt);gl.uniform1f(p.u.uN2,S.N2);gl.uniform1f(p.u.uDecay,.11);gl.uniform1f(p.u.uInit,first?1:0);gl.uniform1f(p.u.uT,simT);
+  to(dens.w,ADW,ADH);draw();dens.swap();first=false;
+  /* to 3D, then light */
+  p=use(P.copy);bind(p,'uD',dens.r.t,0);for(var y=0;y<NY;y++){layer(vol,y,NX,NZ);gl.uniform1i(p.u.uLayer,y);draw();}
+  var day=S.day,el=lerp(.30,.52,day),az=-2.2+.25*Math.sin(simT*.01);
+  var Ld=norm([Math.cos(az)*Math.sqrt(1-el*el),el,Math.sin(az)*Math.sqrt(1-el*el)]);
+  var key=(1-.6*S.cloud),Lc=[lerp(1.3,3.6,day)*key,lerp(1.55,2.85,day)*key,lerp(2.4,2.0,day)*key];
+  var amb=[lerp(.010,.020,day)*(1+S.cloud),lerp(.011,.020,day)*(1+S.cloud),lerp(.028,.042,day)*(1+S.cloud)];
+  var SIG=7.*(Number(Q.get('sig'))||1);
+  p=use(P.light);bind(p,'uVol',vol.t,0,true);gl.uniform3f(p.u.uLd,Ld[0],Ld[1],Ld[2]);gl.uniform1f(p.u.uSig,SIG);
+  for(y=0;y<NY;y++){layer(lit,y,NX,NZ);gl.uniform1i(p.u.uLayer,y);draw();}
+  /* render */
+  p=use(P.render);bind(p,'uVol',vol.t,0,true);bind(p,'uLit',lit.t,1,true);bind(p,'uNz',noiseT,2,true);
+  gl.uniform3f(p.u.uEye,cam.eye[0],cam.eye[1],cam.eye[2]);gl.uniformMatrix3fv(p.u.uRot,false,cam.rot);gl.uniform1f(p.u.uTanH,TANH);gl.uniform1f(p.u.uAsp,CW/CH);
+  gl.uniform3f(p.u.uLd,Ld[0],Ld[1],Ld[2]);gl.uniform3f(p.u.uLc,Lc[0],Lc[1],Lc[2]);gl.uniform3f(p.u.uAmb,amb[0],amb[1],amb[2]);
+  gl.uniform3f(p.u.uFog,amb[0]*.5+Lc[0]*.005,amb[1]*.5+Lc[1]*.005,amb[2]*.5+Lc[2]*.005);
+  gl.uniform1f(p.u.uT,clock);gl.uniform1f(p.u.uSig,SIG);gl.uniform1f(p.u.uHaze,.006+.012*S.cloud);gl.uniform2f(p.u.uRes,RW,RH);
+  to(hdr,RW,RH);draw();
+  /* gentle accumulation over frames, to quiet the sampling noise */
+  p=use(P.acc);bind(p,'uCur',hdr.t,0);bind(p,'uPrev',acc.r.t,1);gl.uniform1f(p.u.uK,accN<1?1:.4);gl.uniform2f(p.u.uRes,RW,RH);to(acc.w,RW,RH);draw();acc.swap();accN++;
+  gl.bindTexture(gl.TEXTURE_2D,acc.r.t);gl.generateMipmap(gl.TEXTURE_2D);
+  p=use(P.disp);bind(p,'uAcc',acc.r.t,0);gl.uniform2f(p.u.uRes,CW,CH);gl.uniform1f(p.u.uT,clock);to(null,CW,CH);draw();
 }
+window.__time=function(){return simT;};
+window.__stats=function(){function rd(t,w,h){gl.bindFramebuffer(gl.FRAMEBUFFER,t.fb);var b=new Float32Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.FLOAT,b);
+  var mx=[-1e9,-1e9,-1e9,-1e9],mn=[1e9,1e9,1e9,1e9],sm=[0,0,0,0],nan=0;for(var i=0;i<b.length;i+=4)for(var c=0;c<4;c++){var v=b[i+c];if(v!==v){nan++;continue;}mx[c]=Math.max(mx[c],v);mn[c]=Math.min(mn[c],v);sm[c]+=v;}
+  return {max:mx.map(function(x){return +x.toFixed(3);}),min:mn.map(function(x){return +x.toFixed(3);}),mean:sm.map(function(x){return +(x/(w*h)).toFixed(4);}),nan:nan};}
+  layer(vol,Math.floor(NY/4),NX,NZ);var vb=new Float32Array(NX*NZ*4);gl.readPixels(0,0,NX,NZ,gl.RGBA,gl.FLOAT,vb);var vm=0;for(var i=0;i<vb.length;i+=4)vm=Math.max(vm,vb[i]);
+  layer(lit,Math.floor(NY/4),NX,NZ);var lb=new Float32Array(NX*NZ*4);gl.readPixels(0,0,NX,NZ,gl.RGBA,gl.FLOAT,lb);var lm=[9,0];for(i=0;i<lb.length;i+=4){lm[0]=Math.min(lm[0],lb[i]);lm[1]=Math.max(lm[1],lb[i]);}
+  return {volmax:vm,lit:lm,dens:rd(dens.r,ADW,ADH),vel:rd(vel.r,AVW,AVH),S:{N2:S.N2,inst:S.inst,turb:S.turb,day:S.day},RS:RS};};
+window.__place=function(i){placeI=i;placeT0=simT;lastCap=-99;};
 requestAnimationFrame(frame);
-})();
+function norm(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
+function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
 
+})();
 </script>
 </body>
 </html>

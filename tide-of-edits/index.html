@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tide of Edits</title>
+<meta name="description" content="Every edit made to any Wikipedia, as it happens, falling as a drop into a sea of glossy paint.">
+<meta name="theme-color" content="#030306">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
@@ -15,7 +17,6 @@
   --line:rgba(236,235,242,.18);
   --glass:rgba(14,14,20,.55);
   --accent:#cfaff4;
-  --live:#ff38d1;
   --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
   --font-body:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:dark;
@@ -26,37 +27,36 @@ body{font-family:var(--font-body);font-size:12px;line-height:1.4}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
 .ui{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:16px;pointer-events:none;transition:opacity .8s ease}
 .ui.idle{opacity:0}
-.placard{pointer-events:none;max-width:60ch;text-shadow:0 1px 14px rgba(3,3,6,.85),0 0 3px rgba(3,3,6,.6)}
-.ui::before{content:"";position:absolute;inset:-60px 0 0 0;background:linear-gradient(to top,rgba(3,3,6,.55),rgba(3,3,6,0));z-index:-1;pointer-events:none}
-.placard h1{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:26px;line-height:1;margin:0 0 6px;letter-spacing:.01em}
-.placard p{margin:0;color:var(--ink-dim);letter-spacing:.04em;text-transform:uppercase;font-size:10px}
-.meta{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex:none}
-.dot.live{background:var(--live)}
-.placard p.tick{margin-top:4px;text-transform:none;letter-spacing:.02em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(60ch,calc(100vw - 32px))}
+.placard{pointer-events:none;max-width:62ch;display:flex;flex-direction:column;gap:5px}
+.placard h1{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:26px;line-height:1;margin:0 0 2px;letter-spacing:.01em}
+.placard p{margin:0;color:var(--ink-dim);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-variant-numeric:tabular-nums}
+.placard p.read{color:var(--ink);text-transform:none;letter-spacing:.02em;font-size:11px}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:auto}
 .btn{font:inherit;font-weight:500;letter-spacing:.06em;text-transform:uppercase;font-size:10px;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .btn:hover{border-color:var(--ink)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn[hidden]{display:none}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:radial-gradient(circle at 40% 40%,#6D23C8,#3C166D 45%,#030306 78%)}
 .fallback p{max-width:40ch;background:var(--glass);padding:14px 18px;border-radius:12px;border:1px solid var(--line)}
 @media (prefers-reduced-motion:reduce){.ui{transition:none}}
-a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.meta{display:flex;align-items:center;gap:8px}.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex:none}.dot.live{background:#ff38d1}.placard p.tick{margin-top:4px;text-transform:none;letter-spacing:.02em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(60ch,calc(100vw - 32px))}
 </style>
 </head>
 <body>
-<canvas id="c" aria-label="Generative artwork: a vast liquid surface where every Wikipedia edit falls as a drop"></canvas>
-<div class="fallback" id="fallback"><p>This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
+<canvas id="c" aria-label="Generative artwork: a sea of glossy violet paint seen from just above; each live Wikipedia edit strikes it as a drop, and larger ones splash up as crowns and jets"></canvas>
+<div class="fallback" id="fallback"><p id="fallbackText">This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
 
 <div class="ui" id="ui">
   <div class="placard">
     <h1>Tide of Edits</h1>
-    <p class="meta"><span class="dot" id="dot"></span><span>Surface waves &middot; <span id="status">Connecting to Wikipedia</span> &middot; <span id="rate">0</span> edits/s</span></p>
+    <p class="meta"><span class="dot" id="dot"></span><span>Drops of paint &middot; <span id="status">Connecting to Wikipedia</span> &middot; <span id="rate">0</span> edits/s</span></p>
     <p class="tick" id="tick">&nbsp;</p>
+    <p>Each language falls in its own region &middot; added text light, removed text dark &middot; tap the paint</p>
   </div>
   <div class="controls">
     <a class="btn back" href="../">&larr; Live Matter</a>
+
     <button class="btn" id="fsBtn" type="button" hidden>Full screen</button>
   </div>
 </div>
@@ -64,271 +64,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 <script>
 (function(){
 'use strict';
-var canvas=document.getElementById('c');
-var gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
-if(!gl){document.getElementById('fallback').style.display='grid';return;}
-
-/* Tide of Edits, surface study: the pigment is now the floor of a vast, shallow liquid seen in perspective.
-   Every Wikipedia edit is a drop falling on it. Rings spread and interfere, and the colours beneath bend
-   through them like light through water. Bytes added fall as crests, bytes removed as troughs. */
-var VS='#version 300 es\nin vec2 aPos;out vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
-var NOISE=[
-'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
-'vec2 grad(vec2 i){float a=6.2831853*hash(i);return vec2(cos(a),sin(a));}',
-'float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*f*(f*(f*6.-15.)+10.);',
-' float v=mix(mix(dot(grad(i),f),dot(grad(i+vec2(1.,0.)),f-vec2(1.,0.)),u.x),mix(dot(grad(i+vec2(0.,1.)),f-vec2(0.,1.)),dot(grad(i+vec2(1.,1.)),f-vec2(1.,1.)),u.x),u.y);',
-' return .5+.75*v;}',
-'const mat2 R=mat2(.6,-.8,.8,.6);',
-'float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=R*p*2.03+17.1;a*=.5;}return s/.9375;}'
-].join('\n');
-
-
-/* Pass 1: the water. A damped wave equation; edits and fingers drop disturbances into it. */
-var FS_WAVE=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
-'uniform sampler2D uPrev;uniform vec2 uTexel;uniform vec4 uDrops[8];uniform int uN;uniform float uDamp,uAsp;',
-'void main(){',
-' vec4 c=texture(uPrev,vUv);float h=c.r,hp=c.g;',
-' float L=texture(uPrev,vUv-vec2(uTexel.x,0.)).r,R=texture(uPrev,vUv+vec2(uTexel.x,0.)).r;',
-' float T=texture(uPrev,vUv+vec2(0.,uTexel.y)).r,B=texture(uPrev,vUv-vec2(0.,uTexel.y)).r;',
-' float nh=(2.*h-hp+.48*(L+R+T+B-4.*h))*uDamp;',
-' for(int i=0;i<8;i++){if(i>=uN)break;vec2 d=(vUv-uDrops[i].xy)*vec2(uAsp,1.);nh+=uDrops[i].z*exp(-dot(d,d)/uDrops[i].w);}',
-' float e=min(min(vUv.x,1.-vUv.x),min(vUv.y,1.-vUv.y));nh*=mix(.93,1.,smoothstep(0.,.06,e));',
-' o=vec4(clamp(nh,-4.,4.),h,0.,1.);',
-'}'].join('\n');
-
-/* Pass 2: the surface, seen from above at a low angle, dissolving into the dark with distance. */
-var FS_SURF=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
-'uniform vec2 uRes;uniform float uT,uClock,uWarp,uHigh,uScale,uMoodPos,uMist,uMood,uFlash,uPitch,uYaw,uCamH;',
-'uniform vec3 uPal[25];uniform sampler2D uWave;uniform vec4 uRect;uniform vec2 uWTex;',
-NOISE,
-'vec3 ramp(int m,float t){t=clamp(t,0.,1.)*4.;float fi=min(floor(t),3.);int i=m*5+int(fi);float fr=t-fi;fr=fr*fr*(3.-2.*fr);return mix(uPal[i],uPal[i+1],fr);}',
-'void pigment(vec2 p,out vec3 col,out float h){',
-' float t=uT;',
-' vec2 q=vec2(fbm(p+vec2(0.,t*.10)),fbm(p+vec2(5.2,1.3)-vec2(t*.08,0.)));',
-' vec2 r=vec2(fbm(p+3.4*q+vec2(1.7,9.2)+t*.06),fbm(p+3.4*q+vec2(8.3,2.8)-t*.05));',
-' float big=noise(p*.38+vec2(t*.13,-t*.09));',
-' float f=fbm(p+uWarp*r);',
-' float streak=noise(r*4.2+q*2.+f*1.2+vec2(t*.05));',
-' float fine=noise(r*7.+q*5.+vec2(-t*.04,t*.03));',
-' float ridge=streak*streak*(3.-2.*streak);',
-' h=(smoothstep(.15,.9,f)*.80+ridge*.06+fine*.03*(1.+2.5*uHigh))*mix(.55,1.18,big);',
-' float tone=smoothstep(.16,.90,f*.92+streak*.16+(q.x-.5)*.22);',
-' float lp=uMoodPos+(r.x-.5)*1.7+(big-.5)*1.0+(q.y-.5)*.6;',
-' float m0=mod(floor(lp),4.);float w=smoothstep(0.,1.,fract(lp));',
-' col=mix(ramp(int(m0),tone),ramp(int(mod(m0+1.,4.)),tone),w);',
-' col=mix(col,ramp(4,tone),uMist*smoothstep(.25,.75,r.y));',
-' col*=.84+.30*streak+.06*fine;',
-' col+=uHigh*.18*fine*uPal[24];',
-' col=col*mix(.86,1.08,uMood)+uFlash*.30*vec3(1.,.576,.898)*smoothstep(.45,.85,f);',
-'}',
-'float waveAt(vec2 u){vec2 e=min(u,1.-u);float m=smoothstep(0.,.08,min(e.x,e.y));return texture(uWave,u).r*m;}',
-'void main(){',
-' vec2 s=(gl_FragCoord.xy-.5*uRes)/uRes.y;',
-' vec3 rd=normalize(vec3(s*1.05,1.));',
-' float cp=cos(uPitch),sp=sin(uPitch);rd=vec3(rd.x,rd.y*cp-rd.z*sp,rd.y*sp+rd.z*cp);',
-' float cy=cos(uYaw),sy=sin(uYaw);rd.xz=mat2(cy,-sy,sy,cy)*rd.xz;',
-' vec3 ink=vec3(.0080,.0070,.0103);',
-' vec3 haze=pow(uPal[7],vec3(2.2))*.025;',
-' vec3 col;',
-' if(rd.y>-.004){col=ink+haze*.4;}',
-' else{',
-'  float t=uCamH/-rd.y;vec3 P=vec3(0.,uCamH,0.)+rd*t;',
-'  vec2 wu=(P.xz-uRect.xy)/uRect.zw;',
-'  float wv=0.;vec2 g=vec2(0.);',
-'  if(all(greaterThan(wu,vec2(0.)))&&all(lessThan(wu,vec2(1.)))){',
-'   wv=waveAt(wu);',
-'   g=vec2(waveAt(wu+vec2(uWTex.x,0.))-waveAt(wu-vec2(uWTex.x,0.)),waveAt(wu+vec2(0.,uWTex.y))-waveAt(wu-vec2(0.,uWTex.y)));',
-'  }',
-'  vec3 alb;float h;',
-'  pigment(P.xz*uScale*.55+g*.35,alb,h);',
-'  alb=pow(alb,vec3(2.2));',
-'  float H=h*.065+wv*.03;',
-'  vec3 Q=P+vec3(0.,H,0.);',
-'  float ex=.012*(1.+t*.5);vec3 c1;float h1,h2;',
-'  pigment((P.xz+vec2(ex,0.))*uScale*.55+g*.35,c1,h1);pigment((P.xz+vec2(0.,ex))*uScale*.55+g*.35,c1,h2);',
-'  vec3 n=normalize(vec3(-(h1-h)*.065/ex,1.,-(h2-h)*.065/ex));',
-'  vec3 gn=normalize(vec3(-g.x*3.,1.,-g.y*3.));n=normalize(mix(n,gn,.6));',
-'  vec3 L=normalize(vec3(-.35,.42,1.));',
-'  vec3 V=-rd;vec3 Hh=normalize(L+V);',
-'  float dif=clamp(dot(n,L)*.55+.45,0.,1.);',
-'  float nh=max(dot(n,Hh),0.);',
-'  float spec=pow(nh,90.)*1.4+pow(nh,16.)*.10;',
-'  float fr=pow(1.-max(dot(n,V),0.),4.);',
-'  vec3 sheen=mix(vec3(.72,.42,1.),vec3(1.,.58,.9),.5+.5*cos(6.2831*(h*.6+fr)));',
-'  float ao=mix(.35,1.,smoothstep(0.,.75,h));',
-'  col=alb*(.18+.95*dif)*ao+spec*vec3(.97,.96,.95)+fr*sheen*.10;',
-'  float fog=exp(-max(t-1.2,0.)*.42);',
-'  col=mix(ink+haze,col,fog);',
-' }',
-' col*=1.3;',
-' col=clamp((col*(2.51*col+.03))/(col*(2.43*col+.59)+.14),0.,1.);',
-' col=pow(col,vec3(1./2.2));',
-' vec2 vv=vUv-.5;col*=1.-.32*dot(vv,vv)*2.;',
-' col+=(hash(gl_FragCoord.xy*1.37+fract(uClock*1.7)*91.)-.5)*.03;',
-' o=vec4(col,1.);',
-'}'].join('\n');
-
-function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
-  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
-function prog(fs){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
-  gl.bindAttribLocation(p,0,'aPos');gl.linkProgram(p);
-  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));throw new Error('link');}
-  var u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
-  for(var i=0;i<n;i++){var info=gl.getActiveUniform(p,i);u[info.name]=gl.getUniformLocation(p,info.name);}
-  return {p:p,u:u};}
-
-
-var pWave,pField;
-try{pWave=prog(FS_WAVE);pField=prog(FS_SURF);}
-catch(err){document.getElementById('fallback').style.display='grid';return;}
-
-/* Palette: Valentina Contini brand, expanded into five moods, each a ramp from shadow to highlight.
-   Verified brand colours are marked (v); the rest are proposed extensions within the same purple-to-magenta family.
-   The first four moods drift into one another; Mist is the muted mood that bot edits bring in. */
-var MOODS=[
-  /* Ultraviolet */ ['#1B1747','#4630D9','#6D23C8'/*v*/,'#B86CFF'/*v*/,'#E7DDF4'/*v*/],
-  /* Signature   */ ['#3C166D'/*v*/,'#6D23C8'/*v*/,'#B86CFF'/*v*/,'#CFAFF4'/*v*/,'#F7F5F2'/*v*/],
-  /* Lab         */ ['#4A0B3F','#9D006C'/*v*/,'#FF38D1'/*v*/,'#FF93E5'/*v*/,'#F7F5F2'/*v*/],
-  /* Ember       */ ['#3C166D'/*v*/,'#D6246E','#FF5C7A','#FFB8A8','#F7F5F2'/*v*/],
-  /* Mist        */ ['#17141B'/*v*/,'#3C166D'/*v*/,'#B8AAC9'/*v*/,'#D6CEDD'/*v*/,'#F7F5F2'/*v*/]
-];
-(function(){
-  var a=[];
-  MOODS.forEach(function(m){m.forEach(function(h){var n=parseInt(h.slice(1),16);a.push((n>>16&255)/255,(n>>8&255)/255,(n&255)/255);});});
-  gl.useProgram(pField.p);gl.uniform3fv(pField.u['uPal[0]'],new Float32Array(a));
-})();
-
-
-var vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
-gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-
-/* Half-float targets where the device allows them, 8-bit otherwise. */
-gl.getExtension('EXT_color_buffer_float');gl.getExtension('EXT_color_buffer_half_float');
-var useFloat=true;
-function makeTarget(w,h){
-  var tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);
-  if(useFloat)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
-  else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  var fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0);
-  var ok=gl.checkFramebufferStatus(gl.FRAMEBUFFER)===gl.FRAMEBUFFER_COMPLETE;
-  if(!ok&&useFloat){useFloat=false;gl.deleteTexture(tex);gl.deleteFramebuffer(fb);return makeTarget(w,h);}
-  gl.viewport(0,0,w,h);gl.clearColor(.5,.5,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
-  return {tex:tex,fb:fb,w:w,h:h};
-}
-
-/* the patch of water the drops fall into, in world units (x across, z away from the viewer) */
-var RECT=[-3.4,.35,6.8,5.6],WW=360,WH=Math.round(360*RECT[3]/RECT[2]);
-var waveA=makeTarget(WW,WH),waveB=makeTarget(WW,WH);
-[waveA,waveB].forEach(function(t){gl.bindFramebuffer(gl.FRAMEBUFFER,t.fb);gl.viewport(0,0,WW,WH);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);});
-
-var W=1,H=1,SC=1;
-function resize(){
-  var dpr=Math.min(window.devicePixelRatio||1,1.5);
-  var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
-  if(w===W&&h===H)return;W=w;H=h;canvas.width=w;canvas.height=h;
-}
-window.addEventListener('resize',resize);resize();
-
-/* camera */
-var cam={pitch:.50,yaw:0,h:1.0};
-function pointToWave(cx,cy){
-  var r=canvas.getBoundingClientRect();
-  var sx=((cx-r.left)-r.width/2)/r.height,sy=-((cy-r.top)-r.height/2)/r.height;
-  var d=[sx*1.05,sy*1.05,1],l=Math.hypot(d[0],d[1],d[2]);d=[d[0]/l,d[1]/l,d[2]/l];
-  var cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);d=[d[0],d[1]*cp-d[2]*sp,d[1]*sp+d[2]*cp];
-  var cy2=Math.cos(cam.yaw),sy2=Math.sin(cam.yaw);d=[cy2*d[0]-sy2*d[2],d[1],sy2*d[0]+cy2*d[2]];
-  if(d[1]>=-.01)return null;
-  var t=cam.h/-d[1],x=d[0]*t,z=d[2]*t;
-  return [(x-RECT[0])/RECT[2],(z-RECT[1])/RECT[3]];
-}
-/* Pointer: a finger drawn across the water leaves a wake. */
-var pt={uv:null,down:false,look:[0,0],acc:0};
-canvas.addEventListener('pointerdown',function(ev){pt.down=true;pt.uv=pointToWave(ev.clientX,ev.clientY);pt.acc=.5;wake();});
-canvas.addEventListener('pointermove',function(ev){
-  wake();
-  var r=canvas.getBoundingClientRect();pt.look=[((ev.clientX-r.left)/r.width-.5)*2,((ev.clientY-r.top)/r.height-.5)*2];
-  if(ev.pointerType!=='mouse'&&!pt.down)return;
-  var u=pointToWave(ev.clientX,ev.clientY);
-  if(u&&pt.uv){pt.acc+=Math.hypot(u[0]-pt.uv[0],u[1]-pt.uv[1])*8;}
-  pt.uv=u;
-});
-function up(){pt.down=false;}
-canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);
-
-/* Data: every edit made to any Wikipedia, as it happens (Wikimedia EventStreams, free and keyless).
-   Each edit falls in its language's own region of the water. Bytes added fall as crests, bytes removed as troughs.
-   Edit rate drives speed and storminess, the mix of languages drives colour, the human/bot balance drives brightness. */
-var statusEl=document.getElementById('status'),rateEl=document.getElementById('rate'),tickEl=document.getElementById('tick');
-var snd={level:0,slow:0,high:0,pitch:.5,energy:0};
-var feed={q:[],count:0,rate:0,mean:6,human:.6,hx:1,hy:0,flash:0,live:false,sim:false,lastTick:0,shown:0};
-var STREAM='https://stream.wikimedia.org/v2/stream/recentchange';
-function h32(str){var h=2166136261;for(var i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);return (h>>>0)/4294967296;}
-function onEdit(wiki,title,delta,bot,isNew){
-  feed.count++;
-  var a=h32(wiki),b=h32(wiki+'/y');
-  var mag=Math.min(1,Math.log(1+Math.abs(delta))/9);
-  if(feed.q.length<40)feed.q.push([.18+.64*a+(Math.random()-.5)*.36,.18+.64*b+(Math.random()-.5)*.36,(.02+.14*mag)*(delta<0?-1:1)]);
-  feed.human+=((bot?0:1)-feed.human)*.02;
-  var w=.012*(.4+mag),ang=a*6.2831;
-  feed.hx+=(Math.cos(ang)-feed.hx)*w;feed.hy+=(Math.sin(ang)-feed.hy)*w;
-  if(isNew)feed.flash=Math.max(feed.flash,.5);
-  var now=performance.now();
-  if(title&&now-feed.lastTick>900){feed.lastTick=now;
-    tickEl.textContent=wiki+' · '+title+' · '+(delta>=0?'+':'−')+Math.abs(delta)+' bytes'+(bot?' · bot':'');}
-}
-var es=null,simTimer=null;
-function startSim(){
-  if(feed.sim||feed.live)return;feed.sim=true;
-  statusEl.textContent='Preview with simulated edits';
-  tickEl.textContent='Wikipedia unreachable, edits simulated';
-  var langs=['en','en','en','en','de','de','fr','fr','es','es','ja','ru','it','zh','pt','ar','nl','pl','uk','fa','sv','ko','tr','id','he','vi','cs'];
-  (function tick(){
-    if(!feed.sim)return;
-    var t=performance.now()/1000,r=7+5*Math.sin(t*.11)+3*Math.sin(t*.37);
-    var d=Math.round(Math.exp(Math.random()*8))*(Math.random()<.3?-1:1);
-    onEdit(langs[Math.floor(Math.random()*langs.length)],'',d,Math.random()<.25,Math.random()<.04);
-    simTimer=setTimeout(tick,-Math.log(1-Math.random())*1000/Math.max(1,r));
-  })();
-}
-function connect(){
-  try{
-    es=new EventSource(STREAM);
-    es.onopen=function(){feed.live=true;feed.sim=false;clearTimeout(simTimer);statusEl.textContent='Live from Wikipedia';document.getElementById('dot').classList.add('live');};
-    es.onmessage=function(m){
-      var d;try{d=JSON.parse(m.data);}catch(e){return;}
-      if(!d||(d.type!=='edit'&&d.type!=='new'))return;
-      if(d.meta&&d.meta.domain==='canary')return;
-      var sn=d.server_name||'';if(sn.indexOf('.wikipedia.org')<0)return;
-      var len=d.length||{};
-      onEdit(sn.split('.')[0],String(d.title||''),(len['new']||0)-(len.old||0),!!d.bot,d.type==='new');
-    };
-    es.onerror=function(){
-      if(feed.live){feed.live=false;statusEl.textContent='Reconnecting to Wikipedia';document.getElementById('dot').classList.remove('live');}
-      else startSim();
-    };
-  }catch(e){startSim();}
-  setTimeout(function(){if(!feed.live)startSim();},8000);
-}
-connect();
-function readAudio(dt){
-  if(dt>0){feed.rate+=(feed.count/dt-feed.rate)*.02;}feed.count=0;
-  feed.mean+=(feed.rate-feed.mean)*.0015;
-  var lvl=Math.max(0,Math.min(1,.4+(feed.rate-feed.mean)/Math.max(2,feed.mean)*1.3));
-  snd.level+=(lvl-snd.level)*.03;
-  snd.energy+=(Math.min(1,feed.rate/22)-snd.energy)*.006;
-  snd.pitch+=((Math.atan2(feed.hy,feed.hx)/6.2831+.5)-snd.pitch)*.01;
-  snd.slow=feed.human*.8;
-  snd.high+=((1-feed.human)*.6-snd.high)*.02;
-  if(++feed.shown%20===0)rateEl.textContent=feed.rate.toFixed(1);
-}
-
-/* Full screen, where the browser offers it. */
+/* Shared: full screen where the browser offers it, controls that fade when untouched. */
 var fsBtn=document.getElementById('fsBtn'),root=document.documentElement;
 if(root.requestFullscreen&&document.fullscreenEnabled){
   fsBtn.hidden=false;
@@ -337,77 +73,510 @@ if(root.requestFullscreen&&document.fullscreenEnabled){
   });
   document.addEventListener('fullscreenchange',function(){fsBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen';});
 }
-
-/* Controls fade when untouched. */
 var ui=document.getElementById('ui'),idleTimer=null;
 function wake(){ui.classList.remove('idle');clearTimeout(idleTimer);idleTimer=setTimeout(function(){if(!ui.matches(':focus-within'))ui.classList.add('idle');},6000);}
-document.addEventListener('keydown',wake);ui.addEventListener('pointerdown',wake);wake();
+window.__wake=wake;
+document.addEventListener('keydown',wake);document.addEventListener('pointermove',wake);document.addEventListener('pointerdown',wake);wake();
+window.__fail=function(msg){if(msg)document.getElementById('fallbackText').textContent=msg;document.getElementById('fallback').style.display='grid';};
+window.__framed=(function(){try{return window.self!==window.top;}catch(e){return true;}})();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+/* Tide of Edits: every edit made to any Wikipedia, as it happens, falling as a drop into a sea of glossy paint.
+   Data: Wikimedia EventStreams (free, no key), 20 to 40 edits a second.
+   Physics kept, look abstracted, in true 3D:
+   - every edit strikes the surface and rings it (a damped wave equation on the GPU) and leaves its pigment,
+     which the surface then stirs and spreads; added text leaves light pigment, removed text dark ink;
+     the sea itself is a single colour, drifting slowly with the mood: every pattern on it was made by an edit;
+   - larger edits are seen falling as drops; on impact they throw up a crown splash and then a Worthington jet,
+     the column that springs up from the crater, whose tip pinches off into a droplet and falls back;
+   - each Wikipedia language falls in its own region; the mix of languages shifts the palette's mood,
+     and bot edits bring in the muted Mist mood. */
+var canvas=document.getElementById('c');
+var gl=canvas.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+if(!gl){window.__fail();return;}
+if(!gl.getExtension('EXT_color_buffer_float')){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+var F32=!!gl.getExtension('OES_texture_float_linear');
+var statusEl=document.getElementById('status'),rateEl=document.getElementById('rate'),tickEl=document.getElementById('tick'),dotEl=document.getElementById('dot');
+var Q=new URLSearchParams(location.search);
+var low=Q.get('q')==='low'||Math.min(screen.width,screen.height)<700;
+var T=5,WN=low?512:1024,DN=low?512:1024,NO=16,RS=low?.55:.72,RSMAX=low?.6:.9,ceilRS=1,wind=.3,fps=60,qt=0;   /* tile, wave grid, dye grid, splash objects, render scale */
 
+var MOODS=[
+  /* Ultraviolet */ ['#1B1747','#4630D9','#6D23C8','#B86CFF','#E7DDF4'],
+  /* Signature   */ ['#3C166D','#6D23C8','#B86CFF','#CFAFF4','#F7F5F2'],
+  /* Lab         */ ['#4A0B3F','#9D006C','#FF38D1','#FF93E5','#F7F5F2'],
+  /* Ember       */ ['#3C166D','#D6246E','#FF5C7A','#FFB8A8','#F7F5F2'],
+  /* Mist        */ ['#17141B','#3C166D','#B8AAC9','#D6CEDD','#F7F5F2']
+];
+var PAL=[];MOODS.forEach(function(m){m.forEach(function(h){var n=parseInt(h.slice(1),16);PAL.push((n>>16&255)/255,(n>>8&255)/255,(n&255)/255);});});
+function rampJS(m,t){t=Math.max(0,Math.min(1,t))*4;var i=Math.min(3,Math.floor(t)),f=t-i;f=f*f*(3-2*f);var a=(m*5+i)*3,b=a+3;
+  return [PAL[a]+(PAL[b]-PAL[a])*f,PAL[a+1]+(PAL[b+1]-PAL[a+1])*f,PAL[a+2]+(PAL[b+2]-PAL[a+2])*f];}
 
+var VS='#version 300 es\nin vec2 aPos;out vec2 vUv;void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.,1.);}';
+var NOISE=[
+'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+'vec2 grad(vec2 i){float a=6.2831853*hash(i);return vec2(cos(a),sin(a));}',
+'float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*f*(f*(f*6.-15.)+10.);',
+' float v=mix(mix(dot(grad(i),f),dot(grad(i+vec2(1.,0.)),f-vec2(1.,0.)),u.x),mix(dot(grad(i+vec2(0.,1.)),f-vec2(0.,1.)),dot(grad(i+vec2(1.,1.)),f-vec2(1.,1.)),u.x),u.y);',
+' return .5+.75*v;}',
+'const mat2 R=mat2(.6,-.8,.8,.6);',
+'float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){s+=a*noise(p);p=R*p*2.03+vec2(1.7,9.2);a*=.5;}return s;}'
+].join('\n');
+
+/* surface waves on the tile (periodic) */
+var FS_WAVE=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform sampler2D uW;uniform vec2 uE;uniform vec4 uD[32];uniform int uDN;uniform float uWind,uT2;',
+'float hh(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+'float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hh(i),hh(i+vec2(1,0)),f.x),mix(hh(i+vec2(0,1)),hh(i+vec2(1,1)),f.x),f.y);}',
+'void main(){vec4 w=texture(uW,vUv);',
+' float l=texture(uW,vUv-vec2(uE.x,0.)).x,r=texture(uW,vUv+vec2(uE.x,0.)).x,dn=texture(uW,vUv-vec2(0.,uE.y)).x,up=texture(uW,vUv+vec2(0.,uE.y)).x;',
+' float h=(2.*w.x-w.y+.40*(l+r+dn+up-4.*w.x))*mix(.9905,.9945,uWind);',
+' h+=.22*((l+r+dn+up)*.25-w.x);',
+' h+=uWind*uWind*.00035*(vn(vUv*70.+uT2*vec2(2.1,.9))+vn(vUv*130.-uT2*vec2(1.3,2.4))-1.);',
+' for(int k=0;k<32;k++){if(k>=uDN)break;vec4 d=uD[k];vec2 dd=vUv-d.xy;dd-=floor(dd+.5);float rr=max(d.w,7.*uE.x);h-=d.z*(d.w*d.w)/(rr*rr)*exp(-dot(dd,dd)/(rr*rr));}',
+' o=vec4(h,w.x,0.,1.);}'].join('\n');
+
+/* pigment left by the drops: stirred by the waves and a slow swirl, slowly absorbed into the sea */
+var FS_DYE=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform sampler2D uDy,uW;uniform vec2 uE;uniform float uT,uDt,uWind;uniform vec4 uP[32],uC[32];uniform int uPN;',NOISE,
+'void main(){',
+' vec2 we=vec2(6./'+WN.toFixed(1)+',0.);',
+' vec2 g=vec2(texture(uW,vUv+we.xy).x-texture(uW,vUv-we.xy).x,texture(uW,vUv+we.yx).x-texture(uW,vUv-we.yx).x);',
+' vec2 sw=vec2(noise(vUv*6.+vec2(uT*.03,0.))-.5,noise(vUv*6.+vec2(3.1,-uT*.03))-.5);',
+' vec2 flow=g*.10+vec2(sw.y,-sw.x)*.0030*(1.+1.5*uWind)+vec2(.0004,.00015)*uWind;',
+' float fl=length(flow*uDt*60.);vec2 step_=fl>1.2*uE.x?flow*uDt*60.*(1.2*uE.x/fl):flow*uDt*60.;',   /* never more than about a texel a frame */
+' vec2 back=vUv-step_;',
+' vec4 c=texture(uDy,back)*.8+.05*(texture(uDy,back+uE*vec2(1.,0.))+texture(uDy,back-uE*vec2(1.,0.))+texture(uDy,back+uE*vec2(0.,1.))+texture(uDy,back-uE*vec2(0.,1.)));',
+' c*=exp(-uDt/150.);',
+' for(int k=0;k<32;k++){if(k>=uPN)break;vec4 P=uP[k];vec2 dd=vUv-P.xy;dd-=floor(dd+.5);',
+'  float a=exp(-dot(dd,dd)/(P.z*P.z))*P.w;c.rgb=mix(c.rgb,uC[k].rgb,min(a,1.)/(min(c.a,1.)+min(a,1.)+1e-4));c.a=min(max(c.a,P.w>1.5?3.:1.),c.a+a);}',
+' o=c;}'].join('\n');
+
+/* the sea of paint, ray-marched, with the splashes blended in as one liquid */
+var FS_MAIN=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform float uPix;uniform vec2 uRes;uniform vec3 uEye;uniform mat3 uRot;uniform float uTanH,uT,uClk,uMoodPos,uMist,uWarp,uHS;',
+'uniform vec3 uPal[25];uniform sampler2D uW,uDy;uniform vec3 uBase,uDeep;',
+'uniform vec4 uO[16],uO2[16],uO3[16],uO4[16],uO5[16];uniform int uON;',
+NOISE,
+'vec3 ramp(int m,float t){t=clamp(t,0.,1.)*4.;float fi=min(floor(t),3.);int i=m*5+int(fi);float fr=t-fi;fr=fr*fr*(3.-2.*fr);return mix(uPal[i],uPal[i+1],fr);}',
+
+'float h3(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}',
+'float n3(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);',
+' return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z);}',
+/* manual bilinear with full-precision weights: GPU texture filtering (notably Apple's) quantises the blend weights
+   to 8 bits, which turns a smooth heightfield into tiny terraces that read as stair-steps at grazing angles */
+'float waveH(vec2 xz){vec2 f=xz*'+(WN/T).toFixed(4)+'-.5;vec2 i=floor(f);vec2 w=f-i;ivec2 a=ivec2(i)&'+(WN-1)+',b=(a+1)&'+(WN-1)+';',
+' float h00=texelFetch(uW,a,0).x,h10=texelFetch(uW,ivec2(b.x,a.y),0).x,h01=texelFetch(uW,ivec2(a.x,b.y),0).x,h11=texelFetch(uW,b,0).x;',
+' return mix(mix(h00,h10,w.x),mix(h01,h11,w.x),w.y)*uHS;}',
+'float gL=0.;vec4 DYS(vec2 uv){return textureLod(uDy,uv,gL);}',
+'float smin(float a,float b,float k){float h=max(k-abs(a-b),0.)/k;return min(a,b)-h*h*k*.25;}',   /* written so that a far-away 1e5 never costs precision */
+/* one splash: falling drop, crown, Worthington jet and its pinched-off droplet */
+'float smax(float a,float b,float k){return -smin(-a,-b,k);}',
+/* Local frame of each splash: it sits on the moving surface and leans with its slope (computed once per pixel). */
+'vec4 FR[16];',
+/* A drop of radius rd hits at speed v. Its Weber number We (inertia against surface tension) decides the regime,
+   as in real drop impacts: below ~30 it coalesces; above, the crater it opens collapses into a Worthington jet;
+   above ~150 the crater rim rises as a crown; above ~350 the crown rim sheds satellite droplets. */
+'float splash(int k,vec3 p,out float carve){',
+' vec4 o=uO[k],o2=uO2[k],o4=uO4[k],o5=uO5[k];float tau=uT-o.z,rd=o2.y,We=o2.w,v=o4.x,tc=o4.y,cs=o4.z,js=o4.w,g=3.5,ph=o5.w;',
+' vec3 d=p-vec3(o.x,tau>0.?FR[k].x*smoothstep(0.,.08,tau):0.,o.y);',
+' float res=1e5;carve=1e5;',
+/* falling: straight down, and wobbling as real drops do (they oscillate between flattened and stretched) */
+' if(tau<0.){if(tau<-v/g)return 1e5;float hc=rd-v*tau-.5*g*tau*tau;vec3 q=d-vec3(0.,hc,0.);float wob=1.+.10*sin(tau*38.+ph*20.);q.y*=wob;q.xz/=sqrt(wob);return (length(q)-rd)*.8;}',
+' if(tau<.07){float u=tau/.07;res=length(d-vec3(0.,rd-v*tau*.8,0.))-rd*(1.-.45*u);}',       /* sinking in */
+' float Rm=rd*(1.15+.065*sqrt(We));',
+' if(tau<tc){float u=tau/tc;float Rc=Rm*pow(max(sin(3.1416*u),0.),.55);carve=length(d-vec3(0.,-Rc*.30,0.))-Rc;}',
+' float slope=length(FR[k].yz);vec2 sd=slope>1e-4?FR[k].yz/slope:vec2(1.,0.);',
+/* the crown: every one different, as in real splash photographs: its number of points, height, an irregular rim
+   that is taller in some places than others, wall thickness, and beads of different sizes (some never form) */
+' float tcr=tc*(1.3+.4*fract(ph*5.1));',
+' if(We>150.){if(tau>.015&&tau<tcr){float u=tau/tcr;float th=atan(d.z,d.x);float nc=o5.x;',
+'  float irr=1.+.22*sin(th*2.+ph*31.)+.14*sin(th*5.+ph*17.)+.08*sin(th*9.+ph*7.);',
+'  float rw=1.+.07*sin(th*3.+ph*11.)+.04*sin(th*7.+ph*5.);',
+'  float cus=.5+.5*cos(th*nc+ph*40.);',
+'  float lean=1.+clamp(dot(vec2(cos(th),sin(th)),sd)*slope*4.,-.3,.35);',
+'  float H=rd*(.35+.0055*min(We,600.))*cs*sin(3.1416*u);',
+'  float hc=H*(1.+.18*cus*cus)*lean*irr;',
+'  float rc=Rm*(.95+.55*u)*rw+smoothstep(0.,max(hc,1e-3),d.y)*rd*.8*u;float wall=rd*(.22-.12*u)*(.75+.5*(.5+.5*sin(th*4.+ph*9.)));',
+'  res=min(res,max(abs(length(d.xz)-rc)-wall,max(d.y-hc,-d.y-rd*.5)));',
+'  float st=6.2832/nc;float ci=floor((th-ph*40./nc)/st+.5);float ang=ci*st+ph*40./nc;',
+'  float bs=fract(sin((ci+ph*57.)*12.9898)*43758.5453);',
+'  float irA=1.+.22*sin(ang*2.+ph*31.)+.14*sin(ang*5.+ph*17.)+.08*sin(ang*9.+ph*7.);',
+'  float rb=Rm*(.95+.55*u)*(1.+.07*sin(ang*3.+ph*11.)+.04*sin(ang*7.+ph*5.))+rd*.8*u;float hb=H*1.18*irA*(1.+clamp(dot(vec2(cos(ang),sin(ang)),sd)*slope*4.,-.3,.35))+rd*.2;',
+'  if(bs>.22&&(We<350.||u<.55))res=smin(res,length(d-vec3(cos(ang)*rb,hb,sin(ang)*rb))-wall*(.8+1.1*bs)*smoothstep(.1,.4,u),wall);}',
+'  if(o5.z>0.&&tau>tcr*.55){float tt=tau-tcr*.55;',                                   /* satellites fly off the rim */
+'   for(int i=0;i<8;i++){if(float(i)>=o5.z)break;float a=float(i)*6.2832/o5.z+ph*7.+.3*sin(float(i)*3.7);float vh=.25+.25*fract(o2.x*13.*float(i+1));',
+'    float r0=Rm*1.75+rd*.5;vec3 sp=vec3(cos(a)*(r0+vh*tt),rd*(.35+.0055*min(We,600.))*.9+(.9+.6*fract(o2.x*7.*float(i+1)))*tt-.5*g*tt*tt,sin(a)*(r0+vh*tt));',
+'    if(sp.y>-rd)res=min(res,length(d-sp)-rd*(.16+.08*fract(o2.x*3.*float(i+1))));}}',
+' }',
+/* the jet: its height and thickness vary; it necks as it rises (the Rayleigh-Plateau instability) and breaks into
+   zero to three droplets of different sizes */
+' if(We>30.){float t0=tc*.8,tj=(.35+.0028*min(We,700.))*(.8+.4*js);if(tau>t0&&tau<t0+tj*1.7){float u=(tau-t0)/tj;',
+'  float hm=rd*(.9+.010*min(We,700.))*js;float hj=hm*sin(3.1416*min(u*1.15,1.))*step(u,1.);',
+'  float yy=clamp(d.y/max(hj,1e-3),0.,1.);',
+'  float neck=1.+.24*smoothstep(.2,.8,u)*sin(yy*6.2832*(1.5+1.5*fract(ph*2.3))+ph*9.-u*4.);',
+'  float rj=rd*(.42+.18*smoothstep(.6,1.,u))*(.8+.4*fract(ph*3.7))*neck;float hcl=clamp(d.y,-rd,hj);',
+'  if(hj>0.)res=smin(res,length(d-vec3(0.,hcl,0.))-rj*(1.-.35*yy),rd*.3);',
+'  for(int i=0;i<3;i++){if(float(i)>=o5.y)break;float fi=float(i);float ui=.5+.13*fi;if(u>ui){float tt=(u-ui)*tj;',
+'   float vi=(.4+.002*We)*js*(1.-.22*fi);float yd=hm*(1.-.10*fi)+rd*.5+vi*tt-.5*g*tt*tt;',
+'   float rs=rd*(.46-.07*fi)*(.8+.4*fract(ph*(7.13+fi*3.1)));',
+'   vec3 c_=vec3(rd*.15*sin(ph*13.+fi*2.)*min(tt*3.,1.),yd,rd*.15*cos(ph*11.+fi*1.7)*min(tt*3.,1.));',
+'   vec3 q=d-c_;float wb=1.+.12*sin(tt*30.+fi*2.);q.y*=wb;q.xz/=sqrt(wb);',
+'   if(yd>-rs)res=min(res,(length(q)-rs)*.85);}}}}',
+' else{if(tau<.5)res=min(res,length(d-vec3(0.,rd*.55*sin(3.1416*tau/.5)-rd*.7,0.))-rd*.8);}', /* coalescence: a small dome */
+' return res;}',
+'float splashW(vec3 p,int mask,out int bk){float w=0.;bk=0;for(int k=0;k<16;k++){if(k>=uON)break;if((mask&(1<<k))==0)continue;float cv;float d=splash(k,p,cv);if(d>=1e4)continue;float wk=1.-smoothstep(-.002,uO2[k].y*1.3,d);if(wk>w){w=wk;bk=k;}}return w;}',
+'float scene(vec3 p,int mask,out int hit){float s=p.y-waveH(p.xz);hit=-1;',
+' for(int k=0;k<16;k++){if(k>=uON)break;if((mask&(1<<k))==0)continue;float cv;float d=splash(k,p,cv);float rd=uO2[k].y;',
+'  if(cv<1e4)s=smax(s,-cv,rd*.6);if(d<1e4){float ns=smin(s,d,rd*.7);if(d<s)hit=k;s=ns;}}',
+' return s;}',
+'vec3 env(vec3 r){',                                                     /* a dark studio: soft boxes for the gloss */
+' vec3 c=mix(vec3(.010,.008,.016),vec3(.06,.035,.10),smoothstep(-.1,.25,r.y))*(1.-smoothstep(.3,1.,r.y)*.6);',
+' float box=exp(-pow((r.x+.15)/.22,2.)-pow((r.y-.55)/.14,2.));',
+' float strip=exp(-pow((r.y-.30)/.12,2.))*smoothstep(1.,.2,abs(r.x-.2));',
+' float rim=pow(max(0.,1.-abs(r.y-.06)*6.),3.)*.35;',
+' return c+vec3(1.,.97,1.)*box*.9+vec3(.95,.85,1.)*strip*.28+vec3(.75,.55,1.)*rim*.45;}',
+/* thin-film interference: the colours of a soap film or oil on water, from film thickness and angle */
+'vec3 film(float nm,float cosT){vec3 lam=vec3(650.,532.,445.);vec3 ph=4.*3.14159*1.38*nm*cosT/lam;vec3 c=.5+.5*cos(ph);c.g*=.80;c=mix(vec3(dot(c,vec3(.36,.30,.34))),c,.45);return c;}',
+'void main(){',
+' vec2 s=(gl_FragCoord.xy-.5*uRes)/uRes.y;',
+' vec3 rd=normalize(uRot*vec3(s*2.*uTanH,1.));vec3 ro=uEye;',
+' vec3 haze=vec3(.035,.022,.06);',
+' vec3 col=haze*(.6+.8*exp(-abs(rd.y)*9.));float dist=60.;',
+/* which splashes could this ray touch? and where does each sit on the moving surface */
+' int mask=0;for(int k=0;k<16;k++){if(k>=uON)break;vec4 o=uO[k];float rb=uO3[k].w;vec3 c=vec3(o.x,uO2[k].z,o.y);',
+'  vec3 oc=ro-c;float b=dot(oc,rd),cc=dot(oc,oc)-rb*rb;if(b*b-cc>0.&&-b+sqrt(b*b-cc)>0.){mask|=1<<k;',
+'   float e=.02;FR[k]=vec4(waveH(o.xy),(waveH(o.xy+vec2(e,0.))-waveH(o.xy-vec2(e,0.)))/(2.*e),(waveH(o.xy+vec2(0.,e))-waveH(o.xy-vec2(0.,e)))/(2.*e),0.);',
+/* a drop or droplet right at the lens would fill the whole view: leave it out of the picture (its ripple still happens) */
+'   float cv0;if(splash(k,ro,cv0)<.12)mask&=~(1<<k);}}',
+' if(rd.y<-.002||mask!=0){',
+'  float t=.02;int hit=-1;float d=1.;bool found=false;',
+/* march with a capped step until the ray passes below the surface, then bisect to the exact crossing:
+   at grazing angles the surface is never skipped, so ripple crests stay whole instead of breaking into dashes */
+'  float fac=.6;float tp=t;',
+'  for(int i=0;i<190;i++){vec3 p=ro+rd*t;d=scene(p,mask,hit);if(d<0.||d<.0004*t+.0002){found=true;break;}tp=t;t+=clamp(d*fac,.0008,.012+t*.05);if(t>45.)break;}',
+'  if(found&&d<0.){float a_=tp,b_=t;for(int j=0;j<7;j++){float m=.5*(a_+b_);if(scene(ro+rd*m,mask,hit)<0.)b_=m;else a_=m;}t=.5*(a_+b_);}',
+'  if(!found&&rd.y<0.){t=min(-ro.y/rd.y,45.);found=t<45.;}',
+'  if(found){',
+'   vec3 P=ro+rd*t;dist=t;int hk;',
+'   int bk;float wS=splashW(P,mask,bk);float upB=wS*smoothstep(.0,.02,P.y-waveH(P.xz));vec2 e=vec2(max(max(.0018+t*.0035,'+(1.6*T/WN).toFixed(4)+'*mix(1.,.35,upB)),t*uPix*1.5),0.);',   /* fine detail only on splash bodies; the wave surface is never sampled finer than its grid */
+'   vec3 n=normalize(vec3(scene(P+e.xyy,mask,hk)-scene(P-e.xyy,mask,hk),scene(P+e.yxy,mask,hk)-scene(P-e.yxy,mask,hk),scene(P+e.yyx,mask,hk)-scene(P-e.yyx,mask,hk)));',
+'   scene(P,mask,hit);',
+'   float fp=t*uPix/max(abs(rd.y),.04);gL=clamp(log2(fp*'+(DN/T).toFixed(3)+'),0.,8.);',
+'   float far=smoothstep(1.,4.,fp*'+(WN/T).toFixed(3)+');n=normalize(mix(n,vec3(0.,1.,0.),far*.9*(1.-wS)));',
+'   vec3 V=-rd;float cosV=max(dot(n,V),0.);',
+/* translucency: we see down into the paint, layer below layer, each dimmer (Beer-Lambert) and shifted by refraction */
+'   vec3 tr=refract(rd,n,1./1.45);',
+'   vec2 sh_=tr.xz/max(-tr.y,.25);',
+'   vec4 dy=DYS(P.xz/'+T.toFixed(1)+');float dA=smoothstep(0.,.7,dy.a);float pearl=smoothstep(1.4,2.4,dy.a)*.6;',
+'   vec2 dq=vec2(3./'+DN.toFixed(1)+',0.);float dyS=.25*(DYS(P.xz/'+T.toFixed(1)+'+dq.xy).a+DYS(P.xz/'+T.toFixed(1)+'-dq.xy).a+DYS(P.xz/'+T.toFixed(1)+'+dq.yx).a+DYS(P.xz/'+T.toFixed(1)+'-dq.yx).a);',
+'   vec4 d1=DYS((P.xz+sh_*.04)/'+T.toFixed(1)+');vec4 d2=DYS((P.xz+sh_*.10)/'+T.toFixed(1)+');',
+'   vec3 a0=mix(uBase,dy.rgb,dA),a1=mix(uBase,d1.rgb,smoothstep(0.,.7,d1.a)*.8),a2=mix(uDeep,d2.rgb,smoothstep(0.,.7,d2.a)*.6);',
+'   float h0=dy.a;',
+'   vec3 body=pow(a0,vec3(2.2))*.34+pow(a1,vec3(2.2))*.24*vec3(.80,.66,1.)+pow(a2,vec3(2.2))*.16*vec3(.55,.38,.95);',
+/* translucency: light passing through the moving surface is focused into caustics on a floor below; we see them
+   through the paint, dimmed by the length of the path through it (Beer-Lambert), so looking straight down shows more */
+'   {float cwt=1.-wS*smoothstep(.0,.012,P.y-FR[bk].x);float Dp=.16;vec2 F=P.xz+tr.xz/max(-tr.y,.2)*Dp;float ce='+(7.*T/WN).toFixed(4)+';',
+'    float lap=(waveH(F+vec2(ce,0.))+waveH(F-vec2(ce,0.))+waveH(F+vec2(0.,ce))+waveH(F-vec2(0.,ce))-4.*waveH(F))/(ce*ce);',
+'    float caus=clamp(1.-lap*.45,.3,1.8);',
+'    float path=Dp/max(-tr.y,.2);vec3 ab=exp(-path*vec3(5.,8.,3.2));',
+'    body+=pow(uBase,vec3(2.2))*(.14+.30*min(caus,2.))*ab*1.2*cwt;}',
+'   float thin=1.;',
+'   if(wS>0.){int hb=bk;float tau=uT-uO[hb].z;vec3 oc=pow(uO3[hb].rgb,vec3(2.2));float fresh=1.-smoothstep(1.5,3.,tau);',
+'    float up=smoothstep(.005,.045,P.y-FR[hb].x);',
+'    vec3 q3=P*38.+vec3(0.,-uT*.6,0.);float sw=n3(q3)*.6+n3(q3*2.3+7.)*.4;',     /* the splash carries its own paint, swirled in 3D */
+'    vec3 own=oc*(.78+.40*sw)+pow(a0,vec3(2.2))*.15;',
+'    body=mix(body,mix(body*.6+oc*.4,own,up),(max(up,.5)*fresh+(1.-fresh)*up*.5)*wS);',
+'    int hk2;thin=mix(1.,clamp(-scene(P-n*uO2[hb].y*.5,mask,hk2)/(uO2[hb].y*.5),0.,1.),wS*up);}',      /* thin walls let light through */
+'   vec3 L=normalize(vec3(-.3,.55,.6));',
+'   float dif=clamp(dot(n,L)*.5+.5,0.,1.);',
+'   float back=pow(max(dot(rd,L)*-1.,0.)*.5+.5,3.)*(1.-thin)*1.4;',                   /* light glowing through the crown walls */
+'   float fr=.04+.96*pow(1.-cosV,5.);',
+'   vec3 R_=reflect(rd,n);vec3 refl=env(R_);',
+'   float fh=470.+170.*sin(dyS*4.+uT*.05)+90.*sin(P.x*1.9+P.z*1.3+uT*.07)+80.*min(dyS,1.)+250.*waveH(P.xz);',        /* film thickness varies over the paint */
+'   vec3 ir=film(fh,sqrt(1.-(1.-cosV*cosV)/(1.38*1.38)));',
+'   vec3 tint=mix(vec3(1.),ir*1.3,.32+.2*pearl);body=mix(body,vec3(.80,.76,.92)*(.8+.4*ir),pearl*.5);',
+'   float sp_=mix(160.,30.,smoothstep(1.,6.,t));float spec=pow(max(dot(n,normalize(L+V)),0.),sp_)*1.8*mix(1.,.35,smoothstep(1.,6.,t));',
+'   col=body*(.10+.55*dif)*(1.-fr*.8)+min(body*back*1.1,vec3(.35))+refl*(fr*.75+.05)*tint+spec*tint;',
+'   col+=ir*fr*.05;',
+'   float fog=exp(-max(t-2.5,0.)*.13);col=mix(haze*(.6+.8*exp(-abs(rd.y)*9.)),col,fog);',
+'  }',
+' }',
+' col=max(col,vec3(0.));if(any(isnan(col))||any(isinf(col)))col=haze;o=vec4(col,dist);}'].join('\n');
+
+/* lens and finish: depth of field from the distance in alpha, bloom, tone */
+/* edge anti-aliasing (FXAA): the scene is rendered below screen resolution, so silhouettes of jets and crowns and
+   grazing ripple crests come out as pixel stairs that the upscale then enlarges; this smooths them along the edge */
+var FS_AA=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;','uniform sampler2D uHdr;',
+'float lu(vec3 c){c=c/(1.+c);return dot(c,vec3(.299,.587,.114));}',
+'void main(){vec2 px=1./vec2(textureSize(uHdr,0));vec4 cM=textureLod(uHdr,vUv,0.);',
+' float lNW=lu(textureLod(uHdr,vUv+vec2(-1.,-1.)*px,0.).rgb),lNE=lu(textureLod(uHdr,vUv+vec2(1.,-1.)*px,0.).rgb);',
+' float lSW=lu(textureLod(uHdr,vUv+vec2(-1.,1.)*px,0.).rgb),lSE=lu(textureLod(uHdr,vUv+vec2(1.,1.)*px,0.).rgb),lM=lu(cM.rgb);',
+' float lmin=min(lM,min(min(lNW,lNE),min(lSW,lSE))),lmax=max(lM,max(max(lNW,lNE),max(lSW,lSE)));',
+' if(lmax-lmin<max(.02,lmax*.08)||cM.a>7.){o=cM;return;}',
+' vec2 dir=vec2(-((lNW+lNE)-(lSW+lSE)),((lNW+lSW)-(lNE+lSE)));',
+' float red=max((lNW+lNE+lSW+lSE)*.03125,1./128.);float rcp=1./(min(abs(dir.x),abs(dir.y))+red);',
+' dir=clamp(dir*rcp,vec2(-4.),vec2(4.))*px;',
+' vec3 A=.5*(textureLod(uHdr,vUv+dir*(1./3.-.5),0.).rgb+textureLod(uHdr,vUv+dir*(2./3.-.5),0.).rgb);',
+' vec3 B=A*.5+.25*(textureLod(uHdr,vUv-dir*.5,0.).rgb+textureLod(uHdr,vUv+dir*.5,0.).rgb);',
+' float lB=lu(B);o=vec4((lB<lmin||lB>lmax)?A:B,cM.a);}'].join('\n');
+
+var FS_COMP=['#version 300 es','precision highp float;','in vec2 vUv;out vec4 o;',
+'uniform sampler2D uHdr;uniform float uClk,uFocus,uAp;',
+/* Catmull-Rom upscaling in five bilinear taps: crisper edges than plain bilinear, without blocky pixels */
+'vec3 cr(sampler2D tx,vec2 uv){vec2 sz=vec2(textureSize(tx,0));vec2 sp=uv*sz;vec2 tc=floor(sp-.5)+.5;vec2 f=sp-tc;',
+' vec2 w0=f*(-.5+f*(1.-.5*f)),w1=1.+f*f*(-2.5+1.5*f),w2=f*(.5+f*(2.-1.5*f)),w3=f*f*(-.5+.5*f);',
+' vec2 w12=w1+w2,o12=w2/w12;vec2 t0=(tc-1.)/sz,t3=(tc+2.)/sz,t12=(tc+o12)/sz;',
+' vec3 r=textureLod(tx,vec2(t12.x,t0.y),0.).rgb*w12.x*w0.y+textureLod(tx,vec2(t0.x,t12.y),0.).rgb*w0.x*w12.y+textureLod(tx,t12,0.).rgb*w12.x*w12.y',
+' +textureLod(tx,vec2(t3.x,t12.y),0.).rgb*w3.x*w12.y+textureLod(tx,vec2(t12.x,t3.y),0.).rgb*w12.x*w3.y;',
+' float ws=w12.x*w0.y+w0.x*w12.y+w12.x*w12.y+w3.x*w12.y+w12.x*w3.y;return max(r/ws,vec3(0.));}',
+'float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}',
+'void main(){vec4 c0=texture(uHdr,vUv);float d=c0.a;',
+' float coc=min(uAp*abs(d-uFocus)/max(d,.05),9.);',          /* circle of confusion, in pixels of the render */
+' vec2 px=1./vec2(textureSize(uHdr,0));float lod=clamp(log2(max(coc*.5,1.)),0.,3.);',
+' vec3 c=lod<.3?cr(uHdr,vUv):textureLod(uHdr,vUv,lod*.5).rgb;float wsum=1.;',
+' for(int i=0;i<12;i++){float a=float(i)*2.3999632;float r=sqrt((float(i)+.5)/12.)*coc;vec2 o2=vec2(cos(a),sin(a))*r*px;',
+'  vec4 s2=textureLod(uHdr,vUv+o2,lod);float w=smoothstep(0.,1.,min(uAp*abs(s2.a-uFocus)/max(s2.a,.05),9.)-r+1.);c+=s2.rgb*w;wsum+=w;}',
+' c/=wsum;',
+' vec3 b=textureLod(uHdr,vUv,3.).rgb*.25+textureLod(uHdr,vUv,5.).rgb*.25;',
+' c+=max(b-.25,0.)*.5;',
+' c*=1.25;c=clamp((c*(2.51*c+.03))/(c*(2.43*c+.59)+.14),0.,1.);c=pow(c,vec3(1./2.2));',
+' vec2 v=vUv-.5;c*=1.-.42*dot(v,v)*2.;c+=(hash(gl_FragCoord.xy+fract(uClk)*71.)-.5)*.02;o=vec4(c,1.);}'].join('\n');
+
+function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
+function prog(fs,names){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+  gl.bindAttribLocation(p,0,'aPos');gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  var u={};names.forEach(function(n){u[n]=gl.getUniformLocation(p,n);});return {p:p,u:u};}
+var pWave,pDye,pMain,pComp,pAA;
+try{
+  pWave=prog(FS_WAVE,['uW','uE','uD','uDN','uWind','uT2']);
+  pDye=prog(FS_DYE,['uDy','uW','uE','uT','uDt','uWind','uP','uC','uPN']);
+  pMain=prog(FS_MAIN,['uPix','uRes','uEye','uRot','uTanH','uT','uClk','uMoodPos','uMist','uWarp','uHS','uPal','uW','uDy','uO','uO2','uO3','uO4','uO5','uON','uBase','uDeep']);
+  pComp=prog(FS_COMP,['uHdr','uClk','uFocus','uAp']);pAA=prog(FS_AA,['uHdr']);
+}catch(e){console.error(e);window.__fail();return;}
+gl.useProgram(pMain.p);gl.uniform3fv(pMain.u.uPal,new Float32Array(PAL));
+var vao=gl.createVertexArray();gl.bindVertexArray(vao);
+var vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+
+function tex(w,h,mip,wrap,f32){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  if(f32)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,null);else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mip?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  var wr=wrap?gl.REPEAT:gl.CLAMP_TO_EDGE;gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,wr);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,wr);return t;}
+function fbo(t){var f=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,f);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('fbo');gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.bindFramebuffer(gl.FRAMEBUFFER,null);return f;}
+var Wt=[],WF=[],Dt=[],DF=[],cw=0,cd=0,hdr=null,hdrF=null,aaT=null,aaF=null;
+try{for(var i=0;i<2;i++){Wt[i]=tex(WN,WN,false,true,F32);WF[i]=fbo(Wt[i]);Dt[i]=tex(DN,DN,true,true);DF[i]=fbo(Dt[i]);gl.bindTexture(gl.TEXTURE_2D,Dt[i]);gl.generateMipmap(gl.TEXTURE_2D);}}
+catch(e){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+var CW=1,CH=1,RW=1,RH=1;
+function resize(){var dpr=Math.min(window.devicePixelRatio||1,1.5);
+  var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
+  if(w===CW&&h===CH&&hdr)return;CW=w;CH=h;canvas.width=w;canvas.height=h;setTarget();}
+/* the internal render target; changing its size never touches the canvas itself */
+function setTarget(){
+  RW=Math.max(1,Math.round(CW*RS));RH=Math.max(1,Math.round(CH*RS));
+  var nt=tex(RW,RH,false,false),nf=fbo(nt),at=tex(RW,RH,true,false),af=fbo(at);
+  if(hdr){gl.deleteTexture(hdr);gl.deleteFramebuffer(hdrF);gl.deleteTexture(aaT);gl.deleteFramebuffer(aaF);}hdr=nt;hdrF=nf;aaT=at;aaF=af;}
+window.addEventListener('resize',resize);resize();
+
+/* ---------- edits ---------- */
+var simT=0,drops=[],paints=[],splashes=[],pending=[],rate=0,count=0,human=.6,hx=1,hy=0,moodPos=Math.random()*4,big={x:T*.5,z:T*.5,at:-99,mag:0};
+function rnd(){return Math.random();}
+function h32(str){var h=2166136261;for(var i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);return (h>>>0)/4294967296;}
+/* The droplets a splash throws (satellites off the crown rim, droplets pinched off the jet) fall back and ring the
+   surface too. Their paths are the same closed-form ballistic paths the shader draws, so the ripple appears exactly
+   where and when each one lands. */
+function fract(x){return x-Math.floor(x);}
+/* each splash gets its own character: crown height and points, jet height, droplets, satellites */
+function splashParams(We){var cs=.75+.5*rnd(),js=.65+.7*rnd(),nc=Math.floor(6+7*rnd()+We/150);
+  var nd=We>300?1+Math.floor(rnd()*3):(We>100?Math.floor(rnd()*2.2):0),ns=We>350?3+Math.floor(rnd()*6):0;
+  return {cs:cs,js:js,nc:nc,nd:nd,ns:ns,ph:rnd()};}
+function secondaries(x,z,tImp,rd,We,tc,seed,col,P){
+  var g=3.5,out=[];
+  if(P.ns>0){var tcr=tc*(1.3+.4*fract(P.ph*5.1)),Rm=rd*(1.15+.065*Math.sqrt(We)),H0=rd*(.35+.0055*Math.min(We,600))*.9;
+    for(var i=0;i<P.ns;i++){var a=i*6.2832/P.ns+P.ph*7+.3*Math.sin(i*3.7),vh=.25+.25*fract(seed*13*(i+1)),vu=.9+.6*fract(seed*7*(i+1));
+      var r=rd*(.16+.08*fract(seed*3*(i+1))),tt=(vu+Math.sqrt(vu*vu+2*g*H0))/g,rr=Rm*1.75+rd*.5+vh*tt;
+      out.push({t:tImp+tcr*.55+tt,x:x+Math.cos(a)*rr,z:z+Math.sin(a)*rr,r:r,v:Math.sqrt(vu*vu+2*g*H0)});}}
+  if(We>30){var t0=tc*.8,tj=(.35+.0028*Math.min(We,700))*(.8+.4*P.js),hm=rd*(.9+.010*Math.min(We,700))*P.js;
+    for(var k=0;k<P.nd;k++){var ui=.5+.13*k,vi=(.4+.002*We)*P.js*(1-.22*k),y0=hm*(1-.10*k)+rd*.5,tl=(vi+Math.sqrt(vi*vi+2*g*y0))/g;
+      var rs=rd*(.46-.07*k)*(.8+.4*fract(P.ph*(7.13+k*3.1)));
+      out.push({t:tImp+t0+ui*tj+tl,x:x+rd*.15*Math.sin(P.ph*13+k*2),z:z+rd*.15*Math.cos(P.ph*11+k*1.7),r:rs,v:Math.sqrt(vi*vi+2*g*y0)});}}
+  out.forEach(function(d){var X=(d.x%T+T)%T,Z=(d.z%T+T)%T;
+    pending.push({t:d.t,drop:[X/T,Z/T,d.r*d.v*.22,Math.max(d.r*1.3,.004)/T],paint:{p:[X/T,Z/T,d.r*2.4/T,.6],c:col}});});
+}
+var lastTick=0;
+function onEdit(wiki,title,delta,bot,isNew){
+  count++;
+  var a=h32(wiki);
+  var x=(a*T+(rnd()-.5)*1.3+T)%T,z=(h32(wiki+'/y')*T+(rnd()-.5)*1.3+T)%T;
+  var mag=Math.min(1,Math.log(1+Math.abs(delta))/9);
+  human+=((bot?0:1)-human)*.02;
+  var w=.012*(.4+mag),ang=a*6.2831;hx+=(Math.cos(ang)-hx)*w;hy+=(Math.sin(ang)-hy)*w;
+  var m=Math.floor(((moodPos%4)+4)%4);
+  var col=delta>=0?rampJS(m,.72+.22*rnd()):rampJS(m,.04+.08*rnd());
+  /* larger edits are seen falling. Size follows the edit; speed varies (bots fall a little faster);
+     together they set the Weber number, and so the kind of splash */
+  if(isNew)col=[.96,.94,1.];                                   /* a new article falls as a pearl */
+  var falls=(Math.abs(delta)>250||isNew)&&splashes.length<NO;
+  if(falls&&camState){var ex=x-camState.eye[0],ez=z-camState.eye[2];ex-=Math.round(ex/T)*T;ez-=Math.round(ez/T)*T;var ed=Math.hypot(ex,ez);
+    if(ed<.45){var k_=.45/Math.max(ed,1e-3);x=((camState.eye[0]+ex*k_)%T+T)%T;z=((camState.eye[2]+ez*k_)%T+T)%T;}}
+  if(falls){
+    var rd=(.010+.028*mag)*(.8+.4*rnd()),v=(1.1+2.1*rnd())*(bot?1.15:1);
+    if(isNew)rd=Math.max(rd,.026);
+    var We=900*rd*v*v,tc=.16+.016*Math.sqrt(We);
+    var tImp=simT+v/3.5;
+    var seed=rnd(),SP=splashParams(We);splashes.push({o:[x,z,tImp,(delta<0?-1:1)],o2:[seed,rd,0,We],o3:[col[0],col[1],col[2],0],o4:[v,tc,SP.cs,SP.js],o5:[SP.nc,SP.nd,SP.ns,SP.ph],end:tImp+3.6});
+    secondaries(x,z,tImp,rd,We,tc,seed,col,SP);
+    pending.push({t:tImp,drop:[x/T,z/T,Math.min(rd*v*.22,.014),Math.max(rd*2.2,.03)/T],paint:{p:[x/T,z/T,rd*2.4/T*(isNew?1.5:1),isNew?3:.8+.2*mag],c:col}});
+    if(mag>big.mag*.7||simT-big.at>6)big={x:x,z:z,at:simT,mag:mag};
+  }else{
+    pending.push({t:simT,drop:[x/T,z/T,(.004+.022*mag)*(delta<0?-.8:1),(.0025+.004*mag)],paint:{p:[x/T,z/T,(.009+.022*mag),.75+.25*mag],c:col}});
+  }
+  var now=performance.now();
+  if(title&&now-lastTick>(isNew?0:900)){lastTick=now+(isNew?3000:0);tickEl.textContent=(isNew?'New article · ':'')+wiki+' · '+title+' · '+(delta>=0?'+':'−')+Math.abs(delta)+' bytes'+(bot?' · bot':'');}
+}
+var es=null,simTimer=null,live=false,sim=false;
+function startSim(){
+  if(sim||live)return;sim=true;
+  statusEl.textContent='Preview with simulated edits';tickEl.textContent='Wikipedia unreachable, edits simulated';
+  var langs=['en','en','en','en','de','de','fr','fr','es','es','ja','ru','it','zh','pt','ar','nl','pl','uk','fa','sv','ko','tr','id','he','vi','cs'];
+  (function tick(){
+    if(!sim)return;
+    var t=performance.now()/1000,r=24+12*Math.sin(t*.11)+6*Math.sin(t*.37);
+    var d=Math.round(Math.exp(Math.random()*9))*(Math.random()<.3?-1:1);
+    onEdit(langs[Math.floor(Math.random()*langs.length)],'',d,Math.random()<.25,Math.random()<.015);
+    simTimer=setTimeout(tick,-Math.log(1-Math.random())*1000/Math.max(1,r));
+  })();
+}
+function connect(){
+  if(window.__framed&&Q.get('live')!=='1'){startSim();return;}
+  try{
+    es=new EventSource('https://stream.wikimedia.org/v2/stream/recentchange');
+    es.onopen=function(){live=true;sim=false;clearTimeout(simTimer);statusEl.textContent='Live from Wikipedia';dotEl.classList.add('live');};
+    es.onmessage=function(m){
+      var d;try{d=JSON.parse(m.data);}catch(e){return;}
+      if(!d||(d.type!=='edit'&&d.type!=='new'))return;
+      if(d.meta&&d.meta.domain==='canary')return;
+      var sn=d.server_name||'';if(sn.indexOf('.wikipedia.org')<0)return;
+      var len=d.length||{};
+      onEdit(sn.split('.')[0],String(d.title||''),(len['new']||0)-(len.old||0),!!d.bot,d.type==='new');
+    };
+    es.onerror=function(){if(live){live=false;statusEl.textContent='Reconnecting to Wikipedia';dotEl.classList.remove('live');}else startSim();};
+  }catch(e){startSim();}
+  setTimeout(function(){if(!live)startSim();},8000);
+}
+connect();
+
+/* tap: a large drop where you touch */
+var camState=null;
+canvas.addEventListener('pointerdown',function(ev){
+  if(!camState)return;var r=canvas.getBoundingClientRect();
+  var sx=((ev.clientX-r.left)-r.width/2)/r.height,sy=-((ev.clientY-r.top)-r.height/2)/r.height;
+  var M=camState.rot,q=[sx*2*TANH,sy*2*TANH,1];
+  var rd=[M[0]*q[0]+M[3]*q[1]+M[6]*q[2],M[1]*q[0]+M[4]*q[1]+M[7]*q[2],M[2]*q[0]+M[5]*q[1]+M[8]*q[2]];
+  if(rd[1]>=-1e-3)return;var t=-camState.eye[1]/rd[1];
+  dropAt(camState.eye[0]+rd[0]*t,camState.eye[2]+rd[2]*t,1);
+});
+function dropAt(X,Z,s){var x=(X%T+T)%T,z=(Z%T+T)%T,m=Math.floor(((moodPos%4)+4)%4),col=rampJS(m,.85);
+  var rd=.04,v=2.6+.6*rnd(),We=900*rd*v*v,tc=.16+.016*Math.sqrt(We),tImp=simT+v/3.5;
+  var seed=rnd(),SP=splashParams(We);splashes.push({o:[x,z,tImp,1],o2:[seed,rd,0,We],o3:[col[0],col[1],col[2],0],o4:[v,tc,SP.cs,SP.js],o5:[SP.nc,SP.nd,SP.ns,SP.ph],end:tImp+3.6});if(splashes.length>NO)splashes.shift();
+  secondaries(x,z,tImp,rd,We,tc,seed,col,SP);
+  pending.push({t:tImp,drop:[x/T,z/T,rd*v*.22,rd*1.3/T],paint:{p:[x/T,z/T,rd*2.4/T,1],c:col}});}
+window.__drop=function(){dropAt(camState?camState.tgt[0]:big.x,camState?camState.tgt[2]:big.z,1);};
+window.__time=function(){return simT;};
+
+/* ---------- loop ---------- */
 var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-var phase=Math.random()*200,clock=Math.random()*900,last=performance.now();
-var langPos=1,flash=0,flashT=0,nextRain=2;
-function drift(t,k){return .5+.25*Math.sin(t*.031*k+k*1.7)+.15*Math.sin(t*.0173*k+k*4.1)+.10*Math.sin(t*.071*k+k*.6);}
-var drops=new Float32Array(32);
-
+var TANH=.40,clock=0,last=performance.now(),cam={x:T*.5,z:T*.5,gx:T*.5,gz:T*.5,vx:0,vz:0,ang:Math.random()*6,close:0},waveAcc=0,shown=0;
 function frame(now){
-  requestAnimationFrame(frame);
-  resize();
-  var dt=Math.min(.05,(now-last)/1000);last=now;clock+=dt;
-  readAudio(dt);
-  var slowF=calm?.3:1;
-  phase+=dt*(.30+.35*drift(clock,1.3)+snd.level*.35+snd.energy*1.2)*slowF;
-  flashT*=Math.pow(.2,dt);flash+=(flashT-flash)*.05;
-  if(feed.flash>0){flashT=Math.max(flashT,feed.flash);feed.flash=0;}
-  /* gather this frame's drops: edits first, then a finger's wake, then a light rain when the stream is quiet */
-  var n=0;
-  while(feed.q.length&&n<6){
-    var ed=feed.q.shift(),a=Math.abs(ed[2]);
-    drops[n*4]=ed[0];drops[n*4+1]=ed[1];drops[n*4+2]=(ed[2]<0?-1:1)*(.3+a*3.2);drops[n*4+3]=.00003+a*.00022;n++;
-  }
-  if(pt.uv&&pt.acc>0&&n<8){
-    var amp=Math.min(.6,pt.acc*.25);
-    drops[n*4]=pt.uv[0];drops[n*4+1]=pt.uv[1];drops[n*4+2]=amp;drops[n*4+3]=.00005;n++;pt.acc=0;
-  }
-  nextRain-=dt;
-  if(nextRain<=0&&n<8&&!calm){
-    drops[n*4]=.1+Math.random()*.8;drops[n*4+1]=.1+Math.random()*.8;drops[n*4+2]=(Math.random()<.5?-1:1)*(.12+Math.random()*.2);drops[n*4+3]=.00003;n++;
-    nextRain=feed.rate>1?2+Math.random()*4:.4+Math.random()*1.2;
-  }
-  var scale=(1.7+1.6*drift(clock,1.0))*(1+snd.energy*.35);
-  var warp=(2.3+2.2*drift(clock,2.1))*(1+snd.energy*.5);
-  var langT=Math.atan2(feed.hy,feed.hx)/6.2831*4,dl=langT-langPos;dl-=4*Math.round(dl/4);langPos+=dl*.006;
-  var moodPos=langPos+clock*.0035+(drift(clock,3.7)-.5)*1.1+.5;
-  var mist=Math.max(0,Math.min(.7,(1-feed.human-.12)*1.8));
-  var mood=Math.min(1,drift(clock,5.3)+snd.slow*.4);
-  var sway=calm?.3:1;
-  cam.yaw+=((Math.sin(clock*.021)*.10*sway+pt.look[0]*.06)-cam.yaw)*.02;
-  cam.pitch+=((.50+Math.sin(clock*.017+1.)*.05*sway-pt.look[1]*.04)-cam.pitch)*.02;
-  cam.h=1.0+Math.sin(clock*.013)*.08*sway;
+  requestAnimationFrame(frame);resize();
+  var rdt=Math.min(.05,Math.max(0,(now-last)/1000));last=now;clock+=rdt;
+  var dt=rdt*(calm?.5:1);simT+=dt;
+  /* the whole of Wikipedia's pace sets the weather: glassy when quiet, a wind when busy */
+  wind+=(Math.min(1,Math.max(0,(rate-14)/30))-wind)*(1-Math.exp(-rdt/20));
+  /* keep the motion smooth: lower the internal resolution if frames are slow, raise it again when there is room */
+  fps+=((rdt>0?1/rdt:60)-fps)*.05;qt+=rdt;
+  /* step down if frames stay slow; step up only after a long smooth stretch, and never back above a level that was too slow,
+     so it settles instead of see-sawing */
+  if(qt>3&&fps<42&&RS>.52){RS=Math.max(.52,RS-.05);ceilRS=RS;qt=0;setTarget();}
+  else if(qt>10&&fps>58&&RS<Math.min(RSMAX,ceilRS)-.001){RS=Math.min(RSMAX,ceilRS,RS+.04);qt=0;setTarget();}
+  if(rdt>0)rate+=(count/rdt-rate)*.03;count=0;
+  if(++shown%20===0)rateEl.textContent=rate.toFixed(1);
+  moodPos+=dt*.003+((Math.atan2(hy,hx)/6.2831+.5)*4-((moodPos%4)+4)%4)*.0006;
+  splashes=splashes.filter(function(s){return s.end>simT;});
+  pending=pending.filter(function(p){if(p.t>simT)return true;if(drops.length<200)drops.push(p.drop);if(paints.length<200)paints.push(p.paint);return false;});
 
-  gl.disable(gl.BLEND);
-  /* two wave steps per frame; drops only in the first */
-  for(var s=0;s<2;s++){
-    gl.bindFramebuffer(gl.FRAMEBUFFER,waveB.fb);gl.viewport(0,0,WW,WH);
-    gl.useProgram(pWave.p);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,waveA.tex);
-    gl.uniform1i(pWave.u.uPrev,0);gl.uniform2f(pWave.u.uTexel,1/WW,1/WH);gl.uniform1f(pWave.u.uAsp,RECT[2]/RECT[3]);
-    gl.uniform1f(pWave.u.uDamp,.9965);gl.uniform1i(pWave.u.uN,s===0?n:0);
-    gl.uniform4fv(pWave.u['uDrops[0]'],drops);
-    gl.drawArrays(gl.TRIANGLES,0,3);
-    var tw=waveA;waveA=waveB;waveB=tw;
+  gl.disable(gl.BLEND);gl.bindVertexArray(vao);
+  /* waves */
+  gl.viewport(0,0,WN,WN);
+  waveAcc+=dt*100;var steps=Math.min(6,Math.floor(waveAcc));waveAcc-=steps;
+  for(var s=0;s<steps;s++){
+    var D=new Float32Array(128),n=0;if(s===0){while(drops.length&&n<32){D.set(drops.shift(),n*4);n++;}}
+    gl.bindFramebuffer(gl.FRAMEBUFFER,WF[1-cw]);gl.useProgram(pWave.p);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,Wt[cw]);gl.uniform1i(pWave.u.uW,0);
+    gl.uniform2f(pWave.u.uE,1/WN,1/WN);gl.uniform1f(pWave.u.uWind,wind);gl.uniform1f(pWave.u.uT2,simT);gl.uniform4fv(pWave.u.uD,D);gl.uniform1i(pWave.u.uDN,n);
+    gl.drawArrays(gl.TRIANGLES,0,3);cw=1-cw;
   }
+  /* pigment */
+  var P=new Float32Array(128),C=new Float32Array(128),np=0;while(paints.length&&np<32){var pp=paints.shift();P.set(pp.p,np*4);C.set([pp.c[0],pp.c[1],pp.c[2],1],np*4);np++;}
+  gl.viewport(0,0,DN,DN);gl.bindFramebuffer(gl.FRAMEBUFFER,DF[1-cd]);gl.useProgram(pDye.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,Dt[cd]);gl.uniform1i(pDye.u.uDy,0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,Wt[cw]);gl.uniform1i(pDye.u.uW,1);
+  gl.uniform2f(pDye.u.uE,1/DN,1/DN);gl.uniform1f(pDye.u.uT,simT);gl.uniform1f(pDye.u.uDt,dt);gl.uniform1f(pDye.u.uWind,wind);
+  gl.uniform4fv(pDye.u.uP,P);gl.uniform4fv(pDye.u.uC,C);gl.uniform1i(pDye.u.uPN,np);
+  gl.drawArrays(gl.TRIANGLES,0,3);cd=1-cd;gl.bindTexture(gl.TEXTURE_2D,Dt[cd]);gl.generateMipmap(gl.TEXTURE_2D);
 
-  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,W,H);
-  gl.useProgram(pField.p);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,waveA.tex);
-  var u=pField.u;
-  gl.uniform1i(u.uWave,0);gl.uniform4f(u.uRect,RECT[0],RECT[1],RECT[2],RECT[3]);gl.uniform2f(u.uWTex,1.5/WW,1.5/WH);
-  gl.uniform2f(u.uRes,W,H);gl.uniform1f(u.uT,phase);gl.uniform1f(u.uClock,clock);
-  gl.uniform1f(u.uWarp,warp);gl.uniform1f(u.uHigh,snd.high);gl.uniform1f(u.uScale,scale);gl.uniform1f(u.uMoodPos,moodPos);
-  gl.uniform1f(u.uMist,mist);gl.uniform1f(u.uMood,mood);gl.uniform1f(u.uFlash,flash);
-  gl.uniform1f(u.uPitch,cam.pitch);gl.uniform1f(u.uYaw,cam.yaw);gl.uniform1f(u.uCamH,cam.h);
+  /* camera: low over the paint, gliding toward the latest large drops */
+  /* two-stage smoothing: the goal follows the action slowly, the camera follows the goal slowly, so it never jerks */
+  var dx=big.x-cam.gx;dx-=Math.round(dx/T)*T;var dz=big.z-cam.gz;dz-=Math.round(dz/T)*T;
+  var k1=1-Math.exp(-rdt/5),k2=1-Math.exp(-rdt/3);
+  cam.gx+=dx*k1;cam.gz+=dz*k1;
+  cam.vx+=((cam.gx-cam.x)*k2-cam.vx)*k2;cam.vz+=((cam.gz-cam.z)*k2-cam.vz)*k2;cam.x+=cam.vx;cam.z+=cam.vz;
+  cam.ang+=rdt*.055;
+  var R=1.3+.3*Math.sin(clock*.021),hgt=.32+.18*Math.sin(clock*.027+1.);
+  var eye=[cam.x+Math.cos(cam.ang)*R,hgt,cam.z+Math.sin(cam.ang)*R],tgt=[cam.x,.02,cam.z];
+  var fwd=norm([tgt[0]-eye[0],tgt[1]-eye[1],tgt[2]-eye[2]]),right=norm(cross([0,1,0],fwd)),up=cross(fwd,right);
+  var rot=new Float32Array([right[0],right[1],right[2],up[0],up[1],up[2],fwd[0],fwd[1],fwd[2]]);
+  camState={eye:eye,rot:rot,tgt:tgt};var focus=Math.hypot(tgt[0]-eye[0],tgt[1]-eye[1],tgt[2]-eye[2]);
+
+  /* splashes, placed on the copy of the tile nearest the camera */
+  var O=new Float32Array(64),O2=new Float32Array(64),O3=new Float32Array(64),O4=new Float32Array(64),O5=new Float32Array(64);
+  splashes.forEach(function(sp,i){var x=sp.o[0]+Math.round((eye[0]-sp.o[0])/T)*T,z=sp.o[1]+Math.round((eye[2]-sp.o[1])/T)*T;
+    var rd=sp.o2[1],We=sp.o2[3],v=sp.o4[0],tau=simT-sp.o[2],cy,R;
+    if(tau<0){cy=rd-v*tau-1.75*tau*tau;R=rd*2.2+.03;}
+    else{var Rm=rd*(1.15+.065*Math.sqrt(We));var top=rd*(.9+.010*Math.min(We,700))*1.4+rd*3+(We>100?.25:0);cy=0;R=Math.max(Rm*2.4+(We>350?.5:0),top)+.06;}
+    O.set([x,z,sp.o[2],sp.o[3]],i*4);O2.set([sp.o2[0],rd,cy,We],i*4);O3.set([sp.o3[0],sp.o3[1],sp.o3[2],R],i*4);O4.set(sp.o4,i*4);O5.set(sp.o5,i*4);});
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,hdrF);gl.viewport(0,0,RW,RH);gl.useProgram(pMain.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,Wt[cw]);gl.uniform1i(pMain.u.uW,0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,Dt[cd]);gl.uniform1i(pMain.u.uDy,1);
+  gl.uniform2f(pMain.u.uRes,RW,RH);gl.uniform1f(pMain.u.uPix,2*TANH/RH);gl.uniform3f(pMain.u.uEye,eye[0],eye[1],eye[2]);gl.uniformMatrix3fv(pMain.u.uRot,false,rot);
+  gl.uniform1f(pMain.u.uTanH,TANH);gl.uniform1f(pMain.u.uT,simT);gl.uniform1f(pMain.u.uClk,clock);
+  /* the sea's own colour: the current mood, drifting slowly from one to the next */
+  var mp=((moodPos%4)+4)%4,m0=Math.floor(mp),fm=mp-m0;fm=fm*fm*(3-2*fm);
+  var b0=rampJS(m0,.42),b1=rampJS((m0+1)%4,.42),d0=rampJS(m0,.12),d1=rampJS((m0+1)%4,.12),mi=Math.max(0,.6-human)*1.2,bm=rampJS(4,.42);
+  var base=[0,1,2].map(function(i){return (b0[i]+(b1[i]-b0[i])*fm)*(1-mi*.5)+bm[i]*mi*.5;}),deep=[0,1,2].map(function(i){return d0[i]+(d1[i]-d0[i])*fm;});
+  gl.uniform3f(pMain.u.uBase,base[0],base[1],base[2]);gl.uniform3f(pMain.u.uDeep,deep[0],deep[1],deep[2]);
+  gl.uniform1f(pMain.u.uMoodPos,moodPos);gl.uniform1f(pMain.u.uMist,Math.max(0,.6-human)*1.2);gl.uniform1f(pMain.u.uWarp,3.4);gl.uniform1f(pMain.u.uHS,.8);
+  gl.uniform4fv(pMain.u.uO,O);gl.uniform4fv(pMain.u.uO2,O2);gl.uniform4fv(pMain.u.uO3,O3);gl.uniform4fv(pMain.u.uO4,O4);gl.uniform4fv(pMain.u.uO5,O5);gl.uniform1i(pMain.u.uON,splashes.length);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,aaF);gl.useProgram(pAA.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,hdr);gl.uniform1i(pAA.u.uHdr,0);gl.drawArrays(gl.TRIANGLES,0,3);
+  gl.bindTexture(gl.TEXTURE_2D,aaT);gl.generateMipmap(gl.TEXTURE_2D);
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,CW,CH);gl.useProgram(pComp.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,aaT);gl.uniform1i(pComp.u.uHdr,0);
+  gl.uniform1f(pComp.u.uClk,clock);gl.uniform1f(pComp.u.uFocus,focus);gl.uniform1f(pComp.u.uAp,RH*.0055);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
+function norm(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
+function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
 requestAnimationFrame(frame);
+
 })();
 </script>
 </body>
