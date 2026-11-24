@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retroflection</title>
+<meta name="description" content="A week of the Agulhas Current, where the Indian Ocean turns back on itself south of Africa, as layers of colliding water drops you drift through.">
+<meta name="theme-color" content="#020a18">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: full-screen canvas, museum placard bottom-left, quiet controls bottom-right. Single dark world by choice. */
+  --wall:#020a18;
+  --ink:#eaf6fb;
+  --ink-dim:#86a3b5;
+  --line:rgba(234,246,251,.18);
+  --glass:rgba(2,12,26,.55);
+  --accent:#9fe8ff;
+  --font-display:"Instrument Serif",Georgia,"Times New Roman",serif;
+  --font-body:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--wall);color:var(--ink);overflow:hidden}
+body{font-family:var(--font-body);font-size:12px;line-height:1.4;background:radial-gradient(90% 80% at 50% 45%,#0a3557 0%,#041a33 45%,#010711 100%)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.ui{position:fixed;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;padding:16px;pointer-events:none;transition:opacity .8s ease}
+.ui.idle{opacity:0}
+.placard{pointer-events:none;max-width:62ch;display:flex;flex-direction:column;gap:5px}
+.placard h1{font-family:var(--font-display);font-style:italic;font-weight:400;font-size:26px;line-height:1;margin:0 0 2px;letter-spacing:.01em}
+.placard p{margin:0;color:var(--ink-dim);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-variant-numeric:tabular-nums}
+.placard p.read{color:var(--ink);text-transform:none;letter-spacing:.02em;font-size:11px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:auto}
+.btn{font:inherit;font-weight:500;letter-spacing:.06em;text-transform:uppercase;font-size:10px;color:var(--ink);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:9px 14px;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);max-width:46vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn:hover{border-color:var(--ink)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[hidden]{display:none}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.fallback{position:fixed;inset:0;display:none;place-items:center;padding:24px;text-align:center;background:radial-gradient(circle at 50% 30%,#0a3557,#020a18 70%)}
+.fallback p{max-width:40ch;background:var(--glass);padding:14px 18px;border-radius:12px;border:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.ui{transition:none}}
+.meta{display:flex;align-items:center;gap:8px}.dot{width:6px;height:6px;border-radius:50%;background:var(--ink-dim);flex:none}.dot.live{background:#9fe0c8}.placard p.tick{margin-top:4px;text-transform:none;letter-spacing:.02em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(70ch,calc(100vw - 32px))}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Generative artwork: drifting through folded layers of water drops that collide and cling, moved by a week of waves, wind and current in the Agulhas Current off southern Africa, replayed as a time-lapse"></canvas>
+<div class="fallback" id="fallback"><p id="fallbackText">This piece needs WebGL 2, which this browser did not provide. Open it in a current version of Safari, Chrome or Firefox.</p></div>
+
+<div class="ui" id="ui">
+  <div class="placard">
+    <h1>Retroflection</h1>
+    <p class="meta"><span class="dot" id="dot"></span><span>Agulhas Current &middot; <span id="status">Fetching the week from Open-Meteo</span></span></p>
+    <p class="tick" id="read">&nbsp;</p>
+    <p>34&deg;S 27&deg;E, off southern Africa &middot; one day every ten minutes &middot; drag to look around &middot; marine data Open-Meteo.com</p>
+  </div>
+  <div class="controls">
+    <a class="btn back" href="../">&larr; Live Matter</a>
+    <button class="btn" id="fsBtn" type="button" hidden>Full screen</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* Shared: full screen where the browser offers it, controls that fade when untouched. */
+var fsBtn=document.getElementById('fsBtn'),root=document.documentElement;
+if(root.requestFullscreen&&document.fullscreenEnabled){
+  fsBtn.hidden=false;
+  fsBtn.addEventListener('click',function(){
+    try{var pr=document.fullscreenElement?document.exitFullscreen():root.requestFullscreen();if(pr&&pr.catch)pr.catch(function(){});}catch(e){}
+  });
+  document.addEventListener('fullscreenchange',function(){fsBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen';});
+}
+var ui=document.getElementById('ui'),idleTimer=null;
+function wake(){ui.classList.remove('idle');clearTimeout(idleTimer);idleTimer=setTimeout(function(){if(!ui.matches(':focus-within'))ui.classList.add('idle');},6000);}
+window.__wake=wake;
+document.addEventListener('keydown',wake);document.addEventListener('pointermove',wake);document.addEventListener('pointerdown',wake);wake();
+window.__fail=function(msg){if(msg)document.getElementById('fallbackText').textContent=msg;document.getElementById('fallback').style.display='grid';};
+window.__framed=(function(){try{return window.self!==window.top;}catch(e){return true;}})();
+})();
+</script>
+<script>
+(function(){
+'use strict';
+/* Retroflection: a week of the Agulhas Current, where the warm Indian Ocean races down Africa's southeast coast,
+   meets the Southern Ocean's swell and turns back on itself.
+   Data: Open-Meteo (free, no key; CC BY 4.0), hourly model values for 34.3°S 26.8°E: the last two days of analysis
+   and the next five of forecast. Live sea state barely changes within a visit, so the week is replayed as a
+   time-lapse, one day every ten minutes, smoothly blended between hours, and refreshed every hour.
+   - wave height lifts the water's layers into swell; wave period rolls them over into curls;
+   - wind roughens them; gusts shake drops loose from the current, so they collide and scatter;
+   - the current's speed sets the pace of everything, including the camera's drift;
+   - sea temperature warms the water's colour.
+   The water: up to 800,000 drops simulated on the graphics card. Each is pulled toward its place on one of 32
+   uneven, folding sheets, pushed apart by drops it overlaps, drawn into contact by drops it nearly touches
+   (surface tension) and dragged along by its neighbours (viscosity). Neighbours are found with a 3D grid. */
+var canvas=document.getElementById('c');
+var gl=canvas.getContext('webgl2',{antialias:false,alpha:true,premultipliedAlpha:true,depth:false,stencil:false,powerPreference:'high-performance'});
+if(!gl){window.__fail();return;}
+if(!gl.getExtension('EXT_color_buffer_float')){window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+var statusEl=document.getElementById('status'),readEl=document.getElementById('read'),dotEl=document.getElementById('dot');
+var Q=new URLSearchParams(location.search);
+var small=Math.min(screen.width,screen.height)<700;
+/* drop counts the piece can step down through when the frame rate is low */
+var LEVELS=[800000,500000,300000,180000,100000],lvl=small?3:0,fixedN=Number(Q.get('drops'))||0;
+var S=10,G=96,TX=12,TY=8,AW=G*TX,AH=G*TY,BRIGHT=.8,SIZE=1.3,STICK=1;
+
+/* ---------- shaders ---------- */
+var HEAD='#version 300 es\nprecision highp float;precision highp int;precision highp sampler2D;\n';
+var QUAD=HEAD+'void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}';
+/* where each drop belongs: its place on one of the folding sheets of water */
+var HOME='uniform float uTime,uFlow,uSwell,uFold,uTurb;\n'+
+ 'vec3 warpH(vec3 p,float t){return vec3(sin(p.y*1.3+t*.37)+.7*sin(p.z*.9-t*.29),sin(p.z*1.1-t*.31)+.7*sin(p.x*1.2+t*.23),sin(p.x*.95+t*.41)+.7*sin(p.y*1.05-t*.27));}\n'+
+ 'vec3 home(vec4 q){float t=uTime,k=q.z;float u=fract(q.x+uFlow*(1.+k*.5));float thick=.015+.09*fract(sin(k*91.7)*437.5);'+
+ ' vec3 p=vec3((u-.5)*2.6,mix(-.92,.92,k)+(q.w-.5)*thick+.05*sin(t*.23+k*31.),(q.y-.5)*2.6);'+
+ ' p.y+=uSwell*.32*(sin(p.x*2.1+t*.5+k*3.)*cos(p.z*1.7-t*.35)+.5*sin((p.x-p.z)*3.3+t*.8));'+
+ ' p+=uFold*.32*warpH(p*1.5+k*1.7,t*.6);p+=uTurb*.035*warpH(p*6.+k*4.,t*1.4);return p;}\n';
+var SIMU='uniform sampler2D tPos,tVel,tGrid,tUV;uniform float uDt,uSize,uSplash,uStick,uInit;uniform int uSZ;out vec4 o;\n';
+var FS={};
+FS.vel=HEAD+SIMU+HOME+
+ 'void main(){ivec2 me2=ivec2(gl_FragCoord.xy);int me=me2.y*uSZ+me2.x;'+
+ ' vec4 P=texelFetch(tPos,me2,0);vec3 p=P.xyz;vec3 v=texelFetch(tVel,me2,0).xyz;vec4 q=texelFetch(tUV,me2,0);vec3 h=home(q);'+
+ ' if(uInit>.5||length(h-p)>.5){o=vec4(0.,0.,0.,1.);return;}'+
+ ' float ri=P.w*uSize*.0042;'+
+ ' vec3 a=mix(70.,14.,uSplash)*(h-p)-mix(9.,3.,uSplash)*v;'+
+ ' a+=uTurb*(.04+.22*uSplash)*warpH(p*9.+q.z*3.,uTime*2.);'+
+ ' if(max(max(abs(p.x),abs(p.y)),abs(p.z))<.999){'+
+ '  ivec3 c=ivec3(floor((p*.5+.5)*'+G+'.));'+
+ '  for(int dz=-1;dz<=1;dz++)for(int dy=-1;dy<=1;dy++)for(int dx=-1;dx<=1;dx++){'+
+ '   ivec3 cc=c+ivec3(dx,dy,dz);if(any(lessThan(cc,ivec3(0)))||any(greaterThan(cc,ivec3('+(G-1)+'))))continue;'+
+ '   int id=int(texelFetch(tGrid,ivec2((cc.z%'+TX+')*'+G+'+cc.x,(cc.z/'+TX+')*'+G+'+cc.y),0).r+.5)-1;'+
+ '   if(id<0||id==me)continue;'+
+ '   ivec2 j=ivec2(id%uSZ,id/uSZ);vec4 Pj=texelFetch(tPos,j,0);vec3 d=p-Pj.xyz;float dist=length(d);'+
+ '   float R=ri+Pj.w*uSize*.0042;if(dist>R*1.9||dist<1e-6)continue;vec3 n=d/dist;'+
+ '   if(dist<R)a+=450.*(R-dist)*n;'+                                         /* collision: push apart */
+ '   else{float x=(dist-R)/(.9*R);a-=uStick*.9*x*(1.-x)*4.*n;}'+             /* surface tension: pull into contact */
+ '   vec3 vj=texelFetch(tVel,j,0).xyz;a-=3.5*(v-vj)*(1.-smoothstep(R,R*1.9,dist));'+ /* viscosity: move together */
+ '  }}'+
+ ' float am=length(a);if(am>120.)a*=120./am;'+
+ ' v+=a*uDt;float vm=length(v);if(vm>1.6)v*=1.6/vm;o=vec4(v,1.);}';
+FS.pos=HEAD+SIMU+HOME+
+ 'void main(){ivec2 me2=ivec2(gl_FragCoord.xy);vec4 P=texelFetch(tPos,me2,0);vec3 v=texelFetch(tVel,me2,0).xyz;vec3 h=home(texelFetch(tUV,me2,0));'+
+ ' vec3 p=(uInit>.5||length(h-P.xyz)>.5)?h:P.xyz+v*uDt;o=vec4(p,P.w);}';
+FS.seed=HEAD+'uniform sampler2D tPos;out vec4 o;void main(){o=texelFetch(tPos,ivec2(gl_FragCoord.xy),0);}';
+/* the neighbour grid: every drop writes its number into the cell it sits in */
+var GRIDV=HEAD+'uniform sampler2D tPos;uniform int uSZ;flat out float vId;\n'+
+ 'void main(){int i=gl_VertexID;vec3 p=texelFetch(tPos,ivec2(i%uSZ,i/uSZ),0).xyz;vId=float(i+1);gl_PointSize=1.;'+
+ ' if(max(max(abs(p.x),abs(p.y)),abs(p.z))>=.999){gl_Position=vec4(2.,2.,2.,1.);return;}'+
+ ' ivec3 c=ivec3(floor((p*.5+.5)*'+G+'.));vec2 px=(vec2((c.z%'+TX+')*'+G+'+c.x,(c.z/'+TX+')*'+G+'+c.y)+.5)/vec2('+AW+'.,'+AH+'.);'+
+ ' gl_Position=vec4(px*2.-1.,0.,1.);}';
+var GRIDF=HEAD+'flat in float vId;out vec4 o;void main(){o=vec4(vId,0.,0.,1.);}';
+/* each drop drawn as a small sphere of water: a highlight, a rim and the light it focuses */
+var DROPV=HEAD+'uniform sampler2D tPos,tUV;uniform int uSZ;uniform mat4 uView,uProjM;uniform float uSize,uProj,uTime,uFade;uniform vec3 cDeep,cBody;\n'+
+ 'out vec3 vTint;out float vFar,vNear;\n'+
+ 'void main(){int i=gl_VertexID;ivec2 r=ivec2(i%uSZ,i/uSZ);vec4 P=texelFetch(tPos,r,0);float sy=texelFetch(tUV,r,0).w;vec3 p=P.xyz;vec3 ap=abs(p);float box=max(max(ap.x,ap.y),ap.z);'+
+ /* a rounded, noisy boundary that drifts, so the water thins into spray instead of ending on a line */
+ ' float e=mix(box,length(p)/1.3,.45);'+
+ ' float n=sin(p.x*3.1+uTime*.13)*sin(p.y*2.7-uTime*.11)*sin(p.z*3.3+uTime*.09)+.5*sin(p.x*7.3-p.z*6.1+uTime*.2)*sin(p.y*6.7+uTime*.17);'+
+ ' float b=.78+.15*n;float edgeFade=1.-smoothstep(b-.26,b,e);'+
+ ' vec4 mv=uView*vec4(p*'+S+'.,1.);float dist=-mv.z;'+
+ ' float fog=1.-smoothstep(3.,18.,dist);'+                     /* underwater visibility: drops dissolve into the dark */
+ ' float rw=uSize*.07*P.w*mix(.3,1.,edgeFade);'+
+ ' vTint=mix(cDeep,cBody,.3+.6*fract(sy*7.31));'+
+ ' vFar=1.-fog;vNear=smoothstep(.8,4.,dist)*edgeFade*fog*uFade;'+
+ ' gl_PointSize=clamp(2.*rw*uProj/max(dist,.01),1.,70.);'+
+ ' gl_Position=(vNear<.003||box>.999||dist<.6)?vec4(2.,2.,2.,1.):uProjM*mv;}';
+var DROPF=HEAD+'uniform vec3 cHi;uniform float uGlow;in vec3 vTint;in float vFar,vNear;out vec4 o;\n'+
+ 'void main(){vec2 c=gl_PointCoord*2.-1.;c.y=-c.y;float r2=dot(c,c);if(r2>1.)discard;'+
+ ' vec3 n=vec3(c,sqrt(1.-r2));vec3 L=normalize(vec3(-.35,.75,.55));float ndl=max(dot(n,L),0.);'+
+ ' float spec=pow(max(dot(reflect(-L,n),vec3(0.,0.,1.)),0.),80.);float rim=pow(1.-n.z,2.2);float caus=smoothstep(.6,0.,length(c+L.xy*.5));'+
+ ' vec3 col=vTint*(.25+.35*ndl)+mix(vTint*2.4,cHi,.4)*caus*.95+mix(vTint,cHi,.4)*rim*.45+vec3(1.)*spec*1.6;'+
+ ' col=mix(col,vTint*.9+cHi*.1,vFar*.35);'+
+ ' float a=clamp(.48+.35*rim+spec+caus*.35,0.,1.)*(1.-.35*vFar)*vNear*(1.-smoothstep(.9,1.,r2)*.6);'+
+ ' o=vec4(col*uGlow*a,a);}';
+
+function sh(type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));throw new Error('shader');}return s;}
+function prog(vs,fs){var p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  var u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+  for(var i=0;i<n;i++){var info=gl.getActiveUniform(p,i);u[info.name.replace('[0]','')]=gl.getUniformLocation(p,info.name);}
+  return {p:p,u:u};}
+var P={};
+try{P.vel=prog(QUAD,FS.vel);P.pos=prog(QUAD,FS.pos);P.seed=prog(QUAD,FS.seed);P.grid=prog(GRIDV,GRIDF);P.drop=prog(DROPV,DROPF);}
+catch(e){console.error(e);window.__fail();return;}
+gl.bindVertexArray(gl.createVertexArray());   /* everything is generated from gl_VertexID: no vertex buffers */
+
+/* ---------- targets ---------- */
+function tex(w,h,data,fmt){var t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  if(fmt==='r')gl.texImage2D(gl.TEXTURE_2D,0,gl.R32F,w,h,0,gl.RED,gl.FLOAT,data||null);
+  else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,w,h,0,gl.RGBA,gl.FLOAT,data||null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  var fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw new Error('fbo');
+  return {t:t,fb:fb,w:w,h:h};}
+function del(x){if(x){gl.deleteTexture(x.t);gl.deleteFramebuffer(x.fb);}}
+var sim=null,grid=null;
+try{grid=tex(AW,AH,null,'r');}catch(e){console.error(e);window.__fail('This piece needs floating-point rendering, which this browser or device does not offer. Try a desktop browser.');return;}
+function use(p){gl.useProgram(p.p);return p;}
+function to(t){gl.bindFramebuffer(gl.FRAMEBUFFER,t?t.fb:null);gl.viewport(0,0,t?t.w:CW,t?t.h:CH);}
+function bind(p,name,t,unit){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t.t);gl.uniform1i(p.u[name],unit);}
+
+/* ---------- the drops ---------- */
+var N=0,SZ=1,born=0;
+function build(n){
+  if(sim){[sim.pA,sim.pB,sim.vA,sim.vB,sim.uv].forEach(del);sim=null;}
+  SZ=Math.round(Math.sqrt(n));N=SZ*SZ;
+  var uvd=new Float32Array(N*4),pd=new Float32Array(N*4);
+  /* 32 sheets at uneven depths, each with its own thickness */
+  var LAY=32,gaps=[],acc=0;for(var j=0;j<LAY;j++){acc+=.25+Math.random()*1.5;gaps.push(acc);}
+  var layer=gaps.map(function(g){return (g-gaps[0])/(acc-gaps[0]);});
+  for(var i=0;i<N;i++){var k=layer[i%LAY],sy=Math.random(),sz=Math.random();
+    uvd[i*4]=Math.random();uvd[i*4+1]=Math.random();uvd[i*4+2]=k;uvd[i*4+3]=sy;pd[i*4+3]=.45+1.2*sz*sz+.25*sy;}
+  try{sim={uv:tex(SZ,SZ,uvd),pA:tex(SZ,SZ,pd),pB:tex(SZ,SZ),vA:tex(SZ,SZ),vB:tex(SZ,SZ)};}
+  catch(e){console.error(e);window.__fail('This piece needs more graphics memory than this device offers.');return false;}
+  [sim.vA,sim.vB].forEach(function(t){to(t);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});
+  step(0,true);step(0,true);born=clock;return true;}
+function simU(p,dt,init){gl.uniform1f(p.u.uTime,T);gl.uniform1f(p.u.uFlow,flow);gl.uniform1f(p.u.uSwell,val('swell'));gl.uniform1f(p.u.uFold,val('fold'));gl.uniform1f(p.u.uTurb,val('turb'));
+  gl.uniform1f(p.u.uDt,dt);gl.uniform1f(p.u.uSize,SIZE);gl.uniform1f(p.u.uSplash,val('splash'));gl.uniform1f(p.u.uStick,STICK);gl.uniform1f(p.u.uInit,init?1:0);gl.uniform1i(p.u.uSZ,SZ);}
+function step(dt,init){
+  gl.disable(gl.BLEND);
+  var p=use(P.grid);bind(p,'tPos',sim.pA,0);gl.uniform1i(p.u.uSZ,SZ);to(grid);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.POINTS,0,N);
+  p=use(P.vel);simU(p,dt,init);bind(p,'tPos',sim.pA,0);bind(p,'tVel',sim.vA,1);bind(p,'tGrid',grid,2);bind(p,'tUV',sim.uv,3);to(sim.vB);gl.drawArrays(gl.TRIANGLES,0,3);
+  p=use(P.pos);simU(p,dt,init);bind(p,'tPos',sim.pA,0);bind(p,'tVel',sim.vB,1);bind(p,'tUV',sim.uv,3);to(sim.pB);gl.drawArrays(gl.TRIANGLES,0,3);
+  var x=sim.pA;sim.pA=sim.pB;sim.pB=x;x=sim.vA;sim.vA=sim.vB;sim.vB=x;}
+
+/* ---------- what the water answers to ---------- */
+/* each behaviour has a floor, so a calm sea still moves gently, never a frozen tank */
+var B={swell:{min:.35,max:1.6,cur:.8},fold:{min:.3,max:1.6,cur:.8},turb:{min:.15,max:1.6,cur:.45},spd:{min:.55,max:2.5,cur:.8},splash:{min:.12,max:1,cur:.3},tone:{min:0,max:1,cur:.3}};
+/* channel, fixed real-world range, tuned to the Agulhas: big Southern Ocean swell, strong winds, one of the fastest currents on Earth */
+var MAP={swell:['wave_height',0,8],fold:['wave_period',5,14],turb:['wind_speed_10m',0,70],spd:['ocean_current_velocity',0,8],splash:['wind_gusts_10m',0,100],tone:['sea_surface_temperature',15,28]};
+function val(k){return B[k].cur;}
+var LAT=-34.3,LON=26.8,HOURS_PER_MIN=Number(Q.get('speed'))||2.4;
+var week=null,live=false,t0=performance.now();
+function nz(t,s){return Math.sin(t*.37+s)*.5+Math.sin(t*.91+s*2.1)*.3+Math.sin(t*2.3+s*3.7)*.2;}
+/* a simulated sea for previews and when the forecast cannot be reached: a storm rolls through every couple of minutes */
+function synth(t){var st=Math.pow(Math.max(0,Math.sin(t*2*Math.PI/140)),3),w=6+5*nz(t*.3,1)+16*st;
+  return {wave_height:Math.max(.5,2.2+.7*nz(t*.08,2)+4*st),wave_period:10+2.5*nz(t*.03,3)+3*st,wind_speed_10m:3.6*w,wind_gusts_10m:3.6*w*(1.3+.25*st),
+    ocean_current_velocity:Math.max(.5,3+1.4*nz(t*.1,4)+1.5*st),sea_surface_temperature:22.5+1.5*nz(t*.01,5),_time:null};}
+function fetchWeek(){
+  if(window.__framed&&Q.get('live')!=='1'){statusEl.textContent='Simulated sea (preview)';return;}
+  var q='?latitude='+LAT+'&longitude='+LON+'&past_days=2&forecast_days=5&timezone=GMT&hourly=';
+  Promise.all([
+    fetch('https://marine-api.open-meteo.com/v1/marine'+q+'wave_height,wave_period,sea_surface_temperature,ocean_current_velocity'),
+    fetch('https://api.open-meteo.com/v1/forecast'+q+'wind_speed_10m,wind_gusts_10m')
+  ].map(function(pr){return pr.then(function(r){if(!r.ok)throw new Error(r.status);return r.json();});})).then(function(js){
+    var times=js[0].hourly.time,vals={};
+    js.forEach(function(j){var h=j.hourly;for(var k in h){if(k==='time')continue;var v=h[k].slice(0,times.length),last=null;
+      for(var i=0;i<v.length;i++){if(v[i]==null)v[i]=last;else last=v[i];}
+      var first=v.find(function(x){return x!=null;});if(first==null)continue;      /* a channel with no data at this point is left out */
+      for(i=0;i<v.length&&v[i]==null;i++)v[i]=first;vals[k]=v;}});
+    if(times.length<2)throw new Error('empty');
+    week={times:times,vals:vals};
+    if(!live)t0=performance.now()-((Date.now()-Date.parse(times[0]+'Z'))/3600000-48)/HOURS_PER_MIN*60000; /* begin about now, two days into the window */
+    live=true;dotEl.classList.add('live');statusEl.textContent='Open-Meteo, the past two days and the next five';
+  }).catch(function(){if(!live)statusEl.textContent='Open-Meteo unreachable · simulated sea';});}
+fetchWeek();setInterval(fetchWeek,60*60*1000);
+function reading(){
+  var tm=(performance.now()-t0)/60000;
+  if(!week)return synth(tm*60);
+  var n=week.times.length,hr=((tm*HOURS_PER_MIN)%(n-1)+(n-1))%(n-1),i=Math.floor(hr),f=hr-i,o={};
+  for(var k in week.vals){var v=week.vals[k];o[k]=v[i]+(v[i+1]-v[i])*f;}
+  var syn=synth(tm*60);for(k in syn)if(o[k]==null)o[k]=syn[k];   /* fill any missing channel so nothing stalls */
+  o._time=new Date(Date.parse(week.times[i]+'Z'));return o;}
+var DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function caption(o){var s='';
+  if(o._time){var d=o._time;s=DAYS[d.getUTCDay()]+' '+d.getUTCDate()+' '+MON[d.getUTCMonth()]+', '+('0'+d.getUTCHours()).slice(-2)+':00 · ';}
+  readEl.textContent=s+'waves '+o.wave_height.toFixed(1)+' m, '+Math.round(o.wave_period)+' s · wind '+Math.round(o.wind_speed_10m)+' km/h · current '+o.ocean_current_velocity.toFixed(1)+' km/h · '+o.sea_surface_temperature.toFixed(1)+' °C';}
+function targets(o){for(var k in MAP){var m=MAP[k],x=o[m[0]],b=B[k];var u=Math.min(1,Math.max(0,(x-m[1])/(m[2]-m[1])));b.v=b.min+u*(b.max-b.min);}}
+
+/* ---------- the camera: a slow drift along a looping path through the layers ---------- */
+var CW=1,CH=1,FOV=72,PROJ=600,view=new Float32Array(16),proj=new Float32Array(16);
+function resize(){var dpr=Math.min(window.devicePixelRatio||1,dprCap);
+  var w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
+  if(w===CW&&h===CH)return;CW=w;CH=h;canvas.width=w;canvas.height=h;
+  FOV=w/h<1?90:72;var f=1/Math.tan(FOV*Math.PI/360),nr=.05,fr=400;PROJ=h/2*f;
+  proj.set([f/(w/h),0,0,0, 0,f,0,0, 0,0,(fr+nr)/(nr-fr),-1, 0,0,2*fr*nr/(nr-fr),0]);}
+var dprCap=1.5;window.addEventListener('resize',resize);resize();
+function path(q){return [S*.4*Math.sin(q),S*(-.15+.32*Math.sin(q*.61+.4)),S*.4*Math.sin(q*.83+1.3)];}
+function nrm(v){var l=Math.hypot(v[0],v[1],v[2])||1;return [v[0]/l,v[1]/l,v[2]/l];}
+function cross(a,b){return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+function lookAt(e,c){var z=nrm([e[0]-c[0],e[1]-c[1],e[2]-c[2]]),x=nrm(cross([0,1,0],z)),y=cross(z,x);
+  view.set([x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0, -(x[0]*e[0]+x[1]*e[1]+x[2]*e[2]),-(y[0]*e[0]+y[1]*e[1]+y[2]*e[2]),-(z[0]*e[0]+z[1]*e[1]+z[2]*e[2]),1]);}
+/* drag to look around; the gaze eases back to the path when left alone */
+var look={yaw:0,pitch:0},ptrs=new Map(),idleLook=9;
+canvas.addEventListener('pointerdown',function(e){canvas.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);idleLook=0;});
+canvas.addEventListener('pointermove',function(e){if(!ptrs.has(e.pointerId))return;var p=ptrs.get(e.pointerId);
+  look.yaw-=(e.clientX-p[0])*.004;look.pitch=Math.max(-1.2,Math.min(1.2,look.pitch+(e.clientY-p[1])*.004));ptrs.set(e.pointerId,[e.clientX,e.clientY]);idleLook=0;});
+function pup(e){ptrs.delete(e.pointerId);}canvas.addEventListener('pointerup',pup);canvas.addEventListener('pointercancel',pup);
+
+/* ---------- colour ---------- */
+var PAL={deep:[.02,.2,.42],body:[.1,.62,.88],warm:[.2,.8,.85],hi:[.9,1,1]};
+
+/* ---------- loop ---------- */
+var calm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var T=0,flow=0,camS=Math.random()*20,clock=0,last=performance.now(),fpsA=50,qt=0,lastCap=-99,obs=null;
+if(!build(fixedN||LEVELS[lvl]))return;
+function frame(now){
+  requestAnimationFrame(frame);resize();
+  var rdt=Math.min(.1,(now-last)/1000);last=now;var dt=Math.min(.05,rdt)*(calm?.5:1);clock+=rdt;
+  fpsA+=(1/Math.max(rdt,1e-3)-fpsA)*.05;
+  /* fewer drops on slower machines: measured after the first seconds, only ever stepping down */
+  qt+=rdt;if(!fixedN&&qt>4&&fpsA<40){qt=0;fpsA=50;
+    if(lvl<LEVELS.length-1){lvl++;build(LEVELS[lvl]);}else if(dprCap>1){dprCap=1;resize();}}
+  if(clock-lastCap>1){obs=reading();targets(obs);caption(obs);lastCap=clock;}
+  var k=1-Math.exp(-dt/.85);for(var b in B)B[b].cur+=(B[b].v-B[b].cur)*k;
+  var sp=val('spd');T+=dt*sp;flow+=dt*sp*.012;
+  camS+=dt*.04*(.6+.4*Math.min(2,sp));
+  var pos=path(camS),nx=path(camS+.08),ahead=nrm([nx[0]-pos[0],nx[1]-pos[1],nx[2]-pos[2]]),inward=nrm([-pos[0],-pos[1],-pos[2]]);
+  var dir=nrm([ahead[0]*.6+inward[0]*.4,ahead[1]*.6+inward[1]*.4,ahead[2]*.6+inward[2]*.4]);
+  idleLook+=rdt;if(idleLook>2&&!ptrs.size){look.yaw*=.995;look.pitch*=.995;}
+  var yw=Math.atan2(dir[0],-dir[2])+look.yaw,pt=Math.max(-1.3,Math.min(1.3,Math.asin(dir[1])+look.pitch));
+  lookAt(pos,[pos[0]+Math.sin(yw)*Math.cos(pt)*10,pos[1]+Math.sin(pt)*10,pos[2]-Math.cos(yw)*Math.cos(pt)*10]);
+  var h=dt*Math.max(.15,sp)/2;step(h,false);step(h,false);
+  /* draw */
+  var tone=val('tone'),body=[0,1,2].map(function(i){return PAL.body[i]+(PAL.warm[i]-PAL.body[i])*tone;});
+  to(null);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND);gl.blendEquation(gl.FUNC_ADD);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+  var p=use(P.drop);bind(p,'tPos',sim.pA,0);bind(p,'tUV',sim.uv,1);gl.uniform1i(p.u.uSZ,SZ);
+  gl.uniformMatrix4fv(p.u.uView,false,view);gl.uniformMatrix4fv(p.u.uProjM,false,proj);
+  gl.uniform1f(p.u.uSize,SIZE);gl.uniform1f(p.u.uProj,PROJ);gl.uniform1f(p.u.uTime,T);gl.uniform1f(p.u.uGlow,BRIGHT);
+  gl.uniform1f(p.u.uFade,Math.min(1,(clock-born)/2.5));
+  gl.uniform3fv(p.u.cDeep,PAL.deep);gl.uniform3fv(p.u.cBody,body);gl.uniform3fv(p.u.cHi,PAL.hi);
+  gl.drawArrays(gl.POINTS,0,N);
+}
+window.__stats=function(){return {drops:N,fps:Math.round(fpsA),live:live,B:Object.keys(B).reduce(function(o,k){o[k]=+B[k].cur.toFixed(3);return o;},{}),obs:obs};};
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

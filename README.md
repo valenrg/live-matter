@@ -1,6 +1,6 @@
 # Live Matter
 
-Generative artworks by Valentina Contini that run live in the browser and answer to touch, sound and streams of data. Each work is abstract, but each is one real physical phenomenon in motion: orbits, splashing paint, the aurora, earthquakes, air in motion.
+Generative artworks by Valentina Contini that run live in the browser and answer to touch, sound and streams of data. Each work is abstract, but each is one real physical phenomenon in motion: orbits, splashing paint, the aurora, earthquakes, air in motion, an ocean current.
 
 **Gallery:** https://valenrg.github.io/live-matter/
 
@@ -11,6 +11,7 @@ Generative artworks by Valentina Contini that run live in the browser and answer
 | 03 | [Solar Breath](solar-breath/) | Live solar wind and Kp index ([NOAA SWPC](https://services.swpc.noaa.gov/json/rtsw/)), touch |
 | 04 | [Presence](presence/) | Live wind and temperature profiles ([Open-Meteo](https://open-meteo.com/), CC BY 4.0), camera (movement only, nothing recorded), touch |
 | 05 | [Fault](fault/) | Live earthquakes ([USGS real-time feeds](https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php)), touch |
+| 06 | [Retroflection](retroflection/) | Wave, wind, current and sea temperature for the Agulhas Current ([Open-Meteo](https://open-meteo.com/) marine and weather forecasts, CC BY 4.0), replayed as a time-lapse; touch |
 
 ## How it's built
 
